@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Grievance Management System"
+description = "A trustworthy public-service platform where people can raise grievances, track progress, view resolutions, and close cases, with dedicated admin and officer workspaces for managing the full lifecycle."
+version = "1.0.0"
+id = "artifacts/grievance-management-system"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23773
+
+[services.development]
+run = "pnpm --filter @workspace/grievance-management-system run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/grievance-management-system", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/grievance-management-system/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23773"
+BASE_PATH = "/"

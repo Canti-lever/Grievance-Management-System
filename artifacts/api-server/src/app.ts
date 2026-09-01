@@ -28,6 +28,11 @@ app.use(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err) {
+    res.status(500).json({ message: "Something went wrong. Please try again." });
+  }
+});
 
 app.use("/api", router);
 

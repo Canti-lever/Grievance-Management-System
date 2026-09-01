@@ -1,22 +1,25 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: REST API for the Grievance Management System
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: grievances
+  - name: admin
+  - name: officer
+  - name: notifications
+  - name: categories
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +27,857 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new citizen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in with email or mobile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out current user
+      responses:
+        "204":
+          description: Logged out
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /users/me:
+    put:
+      operationId: updateCurrentUser
+      tags: [auth]
+      summary: Update current profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /grievances:
+    post:
+      operationId: createGrievance
+      tags: [grievances]
+      summary: Submit a grievance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrievanceInput"
+      responses:
+        "201":
+          description: Grievance created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Grievance"
+  /grievances/{id}:
+    get:
+      operationId: getGrievance
+      tags: [grievances]
+      summary: Get a grievance the current user can access
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Grievance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /my/grievances:
+    get:
+      operationId: listMyGrievances
+      tags: [grievances]
+      summary: List current user's grievances
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/Category"
+        - $ref: "#/components/parameters/Date"
+      responses:
+        "200":
+          description: Paginated grievances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedGrievances"
+  /my/grievances/{id}:
+    get:
+      operationId: getMyGrievance
+      tags: [grievances]
+      summary: Get a current user's grievance
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Grievance detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /my/grievances/{id}/accept:
+    post:
+      operationId: acceptResolution
+      tags: [grievances]
+      summary: Accept a resolution and close a grievance
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Closed grievance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+  /admin/dashboard:
+    get:
+      operationId: getAdminDashboard
+      tags: [admin]
+      summary: Get operational dashboard data
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboard"
+  /admin/grievances:
+    get:
+      operationId: listAdminGrievances
+      tags: [admin]
+      summary: List all grievances with filters
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/Category"
+        - $ref: "#/components/parameters/Officer"
+        - $ref: "#/components/parameters/Department"
+        - $ref: "#/components/parameters/Date"
+        - $ref: "#/components/parameters/Sort"
+      responses:
+        "200":
+          description: Paginated grievances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedGrievances"
+  /admin/grievances/{id}:
+    get:
+      operationId: getAdminGrievance
+      tags: [admin]
+      summary: Get a grievance for review
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Grievance detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+  /admin/grievances/{id}/assign:
+    post:
+      operationId: assignGrievance
+      tags: [admin]
+      summary: Assign grievance to an active officer
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignmentInput"
+      responses:
+        "200":
+          description: Assigned grievance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+  /admin/grievances/{id}/status:
+    patch:
+      operationId: adminChangeStatus
+      tags: [admin]
+      summary: Change grievance status with admin audit trail
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusInput"
+      responses:
+        "200":
+          description: Updated grievance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+  /admin/grievances/{id}/resolution:
+    post:
+      operationId: addAdminResolution
+      tags: [admin]
+      summary: Add a resolution as an administrator
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolutionInput"
+      responses:
+        "200":
+          description: Resolved grievance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+  /admin/users:
+    get:
+      operationId: listUsers
+      tags: [admin]
+      summary: List users and officers
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Role"
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedUsers"
+    post:
+      operationId: createOfficer
+      tags: [admin]
+      summary: Create an officer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfficerInput"
+      responses:
+        "201":
+          description: Officer created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /admin/users/{id}/active:
+    patch:
+      operationId: setUserActive
+      tags: [admin]
+      summary: Activate or deactivate a user
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActiveInput"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /admin/audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [admin]
+      summary: List immutable audit events
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedAuditLogs"
+  /officer/dashboard:
+    get:
+      operationId: getOfficerDashboard
+      tags: [officer]
+      summary: Get officer workload summary
+      responses:
+        "200":
+          description: Officer dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfficerDashboard"
+  /officer/grievances:
+    get:
+      operationId: listOfficerGrievances
+      tags: [officer]
+      summary: List assigned grievances
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Status"
+      responses:
+        "200":
+          description: Assigned grievances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedGrievances"
+  /officer/grievances/{id}:
+    get:
+      operationId: getOfficerGrievance
+      tags: [officer]
+      summary: Get assigned grievance
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Assigned grievance detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+  /officer/grievances/{id}/status:
+    patch:
+      operationId: officerChangeStatus
+      tags: [officer]
+      summary: Update status of assigned grievance
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusInput"
+      responses:
+        "200":
+          description: Updated grievance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+  /officer/grievances/{id}/resolution:
+    post:
+      operationId: addOfficerResolution
+      tags: [officer]
+      summary: Resolve an assigned grievance
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolutionInput"
+      responses:
+        "200":
+          description: Resolved grievance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrievanceDetail"
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List active grievance categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+  /admin/categories:
+    post:
+      operationId: createCategory
+      tags: [categories]
+      summary: Create category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+  /admin/categories/{id}:
+    put:
+      operationId: updateCategory
+      tags: [categories]
+      summary: Update category
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "200":
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+    delete:
+      operationId: deactivateCategory
+      tags: [categories]
+      summary: Deactivate category
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Category deactivated
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List current user's notifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark notification read
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications read
+      responses:
+        "204":
+          description: Notifications marked read
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    Page:
+      name: page
+      in: query
+      schema: { type: number, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: number, minimum: 10, maximum: 100, default: 20 }
+    Search:
+      name: search
+      in: query
+      schema: { type: string }
+    Status:
+      name: status
+      in: query
+      schema: { $ref: "#/components/schemas/GrievanceStatus" }
+    Category:
+      name: category
+      in: query
+      schema: { type: string }
+    Officer:
+      name: officer
+      in: query
+      schema: { type: string }
+    Department:
+      name: department
+      in: query
+      schema: { type: string }
+    Date:
+      name: date
+      in: query
+      schema: { type: string }
+    Sort:
+      name: sort
+      in: query
+      schema: { type: string, enum: [createdAt, updatedAt, status] }
+    Role:
+      name: role
+      in: query
+      schema: { $ref: "#/components/schemas/UserRole" }
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
   schemas:
     HealthStatus:
       type: object
+      properties: { status: { type: string } }
+      required: [status]
+    Error:
+      type: object
       properties:
-        status:
-          type: string
-      required:
-        - status
-
+        message: { type: string }
+      required: [message]
+    UserRole:
+      type: string
+      enum: [USER, ADMIN, OFFICER]
+    GrievanceStatus:
+      type: string
+      enum: [SUBMITTED, ACKNOWLEDGED, ASSIGNED, IN_PROGRESS, RESOLVED, CLOSED]
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: ["string", "null"] }
+        mobile: { type: string }
+        role: { $ref: "#/components/schemas/UserRole" }
+        isActive: { type: boolean }
+        department: { type: ["string", "null"] }
+        createdAt: { type: string }
+      required: [id, name, email, mobile, role, isActive, department, createdAt]
+    RegisterInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: ["string", "null"] }
+        mobile: { type: string, minLength: 7 }
+        password: { type: string, minLength: 8 }
+        confirmPassword: { type: string, minLength: 8 }
+      required: [name, mobile, password, confirmPassword]
+    LoginInput:
+      type: object
+      properties:
+        identifier: { type: string, minLength: 3 }
+        password: { type: string, minLength: 1 }
+      required: [identifier, password]
+    AuthResponse:
+      type: object
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+      required: [user]
+    ProfileUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: ["string", "null"] }
+        mobile: { type: string, minLength: 7 }
+      required: [name, mobile]
+    Category:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        isActive: { type: boolean }
+      required: [id, name, description, isActive]
+    CategoryInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        description: { type: ["string", "null"] }
+      required: [name]
+    Attachment:
+      type: object
+      properties:
+        name: { type: string }
+        size: { type: number }
+        mimeType: { type: string }
+        url: { type: string }
+      required: [name, size, mimeType, url]
+    Grievance:
+      type: object
+      properties:
+        id: { type: string }
+        grievanceId: { type: string }
+        subject: { type: string }
+        description: { type: string }
+        category: { $ref: "#/components/schemas/Category" }
+        relatedOrganization: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/GrievanceStatus" }
+        assignedDepartment: { type: ["string", "null"] }
+        assignedOfficer: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        resolvedAt: { type: ["string", "null"] }
+        closedAt: { type: ["string", "null"] }
+      required: [id, grievanceId, subject, description, category, relatedOrganization, status, assignedDepartment, assignedOfficer, createdAt, updatedAt, resolvedAt, closedAt]
+    GrievanceInput:
+      type: object
+      properties:
+        categoryId: { type: string }
+        subject: { type: string, minLength: 5, maxLength: 160 }
+        description: { type: string, minLength: 20, maxLength: 5000 }
+        relatedOrganization: { type: ["string", "null"], maxLength: 160 }
+        attachment:
+          type: ["object", "null"]
+          properties:
+            name: { type: string }
+            size: { type: number, maximum: 10485760 }
+            mimeType: { type: string }
+            dataUrl: { type: string }
+          required: [name, size, mimeType, dataUrl]
+      required: [categoryId, subject, description]
+    StatusHistory:
+      type: object
+      properties:
+        id: { type: string }
+        oldStatus: { type: ["string", "null"] }
+        newStatus: { $ref: "#/components/schemas/GrievanceStatus" }
+        changedBy: { type: string }
+        comment: { type: ["string", "null"] }
+        createdAt: { type: string }
+      required: [id, oldStatus, newStatus, changedBy, comment, createdAt]
+    Resolution:
+      type: object
+      properties:
+        text: { type: string }
+        internalNotes: { type: ["string", "null"] }
+        resolvedAt: { type: string }
+        resolvedBy: { type: string }
+      required: [text, internalNotes, resolvedAt, resolvedBy]
+    GrievanceDetail:
+      allOf:
+        - $ref: "#/components/schemas/Grievance"
+        - type: object
+          properties:
+            user: { $ref: "#/components/schemas/User" }
+            attachment: { type: ["object", "null"], allOf: [{ $ref: "#/components/schemas/Attachment" }] }
+            history:
+              type: array
+              items: { $ref: "#/components/schemas/StatusHistory" }
+            resolution: { type: ["object", "null"], allOf: [{ $ref: "#/components/schemas/Resolution" }] }
+          required: [user, attachment, history, resolution]
+    PaginatedGrievances:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Grievance" }
+        page: { type: number }
+        pageSize: { type: number }
+        total: { type: number }
+        totalPages: { type: number }
+      required: [items, page, pageSize, total, totalPages]
+    AssignmentInput:
+      type: object
+      properties:
+        department: { type: string, minLength: 2 }
+        officerId: { type: string }
+      required: [department, officerId]
+    StatusInput:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/GrievanceStatus" }
+        comment: { type: ["string", "null"] }
+      required: [status]
+    ResolutionInput:
+      type: object
+      properties:
+        resolution: { type: string, minLength: 10, maxLength: 5000 }
+        internalNotes: { type: ["string", "null"], maxLength: 5000 }
+      required: [resolution]
+    OfficerInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: string }
+        mobile: { type: string, minLength: 7 }
+        password: { type: string, minLength: 8 }
+        department: { type: string, minLength: 2 }
+      required: [name, email, mobile, password, department]
+    ActiveInput:
+      type: object
+      properties: { isActive: { type: boolean } }
+      required: [isActive]
+    AdminDashboard:
+      type: object
+      properties:
+        total: { type: number }
+        newCount: { type: number }
+        inProgress: { type: number }
+        resolved: { type: number }
+        closed: { type: number }
+        byStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { $ref: "#/components/schemas/GrievanceStatus" }
+              count: { type: number }
+            required: [status, count]
+        byCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              category: { type: string }
+              count: { type: number }
+            required: [category, count]
+        recent:
+          type: array
+          items: { $ref: "#/components/schemas/Grievance" }
+      required: [total, newCount, inProgress, resolved, closed, byStatus, byCategory, recent]
+    OfficerDashboard:
+      type: object
+      properties:
+        assigned: { type: number }
+        pending: { type: number }
+        inProgress: { type: number }
+        resolved: { type: number }
+        recent:
+          type: array
+          items: { $ref: "#/components/schemas/Grievance" }
+      required: [assigned, pending, inProgress, resolved, recent]
+    Notification:
+      type: object
+      properties:
+        id: { type: string }
+        grievanceId: { type: ["string", "null"] }
+        title: { type: string }
+        message: { type: string }
+        isRead: { type: boolean }
+        createdAt: { type: string }
+      required: [id, grievanceId, title, message, isRead, createdAt]
+    AuditLog:
+      type: object
+      properties:
+        id: { type: string }
+        actor: { type: string }
+        action: { type: string }
+        entityType: { type: string }
+        entityId: { type: string }
+        details: { type: ["string", "null"] }
+        createdAt: { type: string }
+      required: [id, actor, action, entityType, entityId, details, createdAt]
+    PaginatedAuditLogs:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AuditLog" }
+        page: { type: number }
+        pageSize: { type: number }
+        total: { type: number }
+        totalPages: { type: number }
+      required: [items, page, pageSize, total, totalPages]
+    PaginatedUsers:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/User" }
+        page: { type: number }
+        pageSize: { type: number }
+        total: { type: number }
+        totalPages: { type: number }
+      required: [items, page, pageSize, total, totalPages]
