@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
@@ -79,17 +79,17 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  --background: 42 35% 96%;
+  --background: 210 22% 96%;
 
-  --foreground: 204 35% 17%;
+  --foreground: 214 37% 16%;
 
-  --border: 40 22% 86%;
+  --border: 210 18% 87%;
 
-  --card: 42 42% 99%;
+  --card: 0 0% 100%;
 
-  --card-foreground: 204 35% 17%;
+  --card-foreground: 214 37% 16%;
 
-  --card-border: 40 22% 86%;
+  --card-border: 210 18% 87%;
 
   --sidebar: 198 42% 18%;
 
@@ -107,44 +107,44 @@
 
   --sidebar-ring: 38 74% 63%;
 
-  --popover: 42 42% 99%;
+  --popover: 0 0% 100%;
 
-  --popover-foreground: 204 35% 17%;
+  --popover-foreground: 214 37% 16%;
 
-  --popover-border: 40 22% 86%;
+  --popover-border: 210 18% 87%;
 
-  --primary: 197 45% 30%;
+  --primary: 199 89% 43%;
 
-  --primary-foreground: 42 42% 99%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 38 74% 63%;
+  --secondary: 199 78% 93%;
 
-  --secondary-foreground: 204 35% 17%;
+  --secondary-foreground: 199 89% 30%;
 
-  --muted: 40 26% 91%;
+  --muted: 210 20% 93%;
 
-  --muted-foreground: 203 17% 45%;
+  --muted-foreground: 214 12% 47%;
 
-  --accent: 173 34% 37%;
+  --accent: 214 37% 16%;
 
-  --accent-foreground: 42 42% 99%;
+  --accent-foreground: 0 0% 100%;
 
   --destructive: 4 67% 48%;
 
   --destructive-foreground: 42 42% 99%;
 
-  --input: 40 22% 86%;
-  --ring: 197 45% 30%;
+  --input: 210 18% 82%;
+  --ring: 199 89% 43%;
   --chart-1: 197 45% 30%;
   --chart-2: 38 74% 63%;
   --chart-3: 173 34% 37%;
   --chart-4: 4 67% 48%;
   --chart-5: 204 35% 17%;
 
-  --app-font-sans: 'DM Sans', sans-serif;
-  --app-font-serif: Georgia, serif;
+  --app-font-sans: 'Plus Jakarta Sans', sans-serif;
+  --app-font-serif: 'Plus Jakarta Sans', sans-serif;
   --app-font-mono: 'Space Mono', monospace;
-  --radius: 0.75rem;
+  --radius: 0.35rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0); /*replace with H S L */
   --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0); /*replace with H S L */
   --shadow-sm:
@@ -450,10 +450,34 @@
 .stagger-2 { animation-delay: 120ms; }
 .stagger-3 { animation-delay: 180ms; }
 .skeleton { animation: soft-pulse 1.4s ease-in-out infinite; background: hsl(var(--muted)); border-radius: .5rem; }
-.display-type { font-family: var(--app-font-serif); letter-spacing: -.035em; }
+.display-type { font-family: var(--app-font-sans); letter-spacing: -.035em; }
 .mono-type { font-family: var(--app-font-mono); letter-spacing: -.03em; }
 .paper-grid {
   background-image: linear-gradient(hsl(var(--border) / .42) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / .42) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 .focus-ring:focus-visible { outline: 3px solid hsl(var(--secondary) / .65); outline-offset: 3px; }
+
+/* DPDP-inspired portal treatment: compact, bordered, and information-first. */
+body { background: #f4f6f8; color: #172333; }
+.display-type { letter-spacing: -.045em; }
+[class~="bg-[#fffdf8]"] { background-color: #fff !important; }
+[class~="bg-[#f7f4ea]"], [class~="bg-[#f4f2eb]"] { background-color: #f4f6f8 !important; }
+[class~="bg-[#faf9f4]"] { background-color: #078dca !important; color: #fff !important; }
+[class~="bg-[#f5f3ed]"] { background-color: #f7f9fa !important; }
+[class~="bg-[#fff0eb]"] { background-color: #fff1f0 !important; }
+[class~="bg-[#eaf3ef]"], [class~="bg-[#e2eeea]"] { background-color: #eef8fb !important; }
+[class~="bg-[#315d68]"], [class~="bg-[#203f4d]"], [class~="bg-[#244d5e]"] { background-color: #0d1830 !important; }
+[class~="bg-[#efc574]"], [class~="bg-[#f4c875]"] { background-color: #078dca !important; color: #fff !important; }
+[class~="text-[#203c49]"], [class~="text-[#315467]"] { color: #172333 !important; }
+[class~="text-[#3f7673]"], [class~="text-[#a16e32]"] { color: #078dca !important; }
+[class~="border-[#dfdfd5]"], [class~="border-[#e8e5dc]"], [class~="border-[#d7d8cf]"] { border-color: #d8e0e5 !important; }
+[class~="rounded-2xl"] { border-radius: 4px !important; }
+[class~="rounded-xl"] { border-radius: 4px !important; }
+.portal-table-wrap { overflow-x: auto; border: 1px solid #d8e0e5; background: #fff; }
+.portal-table { min-width: 760px; width: 100%; border-collapse: collapse; }
+.portal-table th { background: #078dca; color: #fff; padding: 10px 13px; font-size: 12px; font-weight: 700; text-align: left; white-space: nowrap; }
+.portal-table td { border-bottom: 1px solid #e3e8eb; padding: 12px 13px; font-size: 13px; color: #3d4854; vertical-align: top; }
+.portal-table tr:last-child td { border-bottom: 0; }
+.portal-table tbody tr:hover { background: #f4fbfd; }
+[data-testid^="status-"] { border-color: #b8dce8 !important; background: #eaf7fb !important; color: #0679ae !important; border-radius: 3px !important; }
