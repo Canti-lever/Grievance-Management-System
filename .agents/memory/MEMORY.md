@@ -1,0 +1,1 @@
+- [Protected route auth](protected-route-auth.md) — disable retries on session checks so unauthenticated portal routes redirect promptly.

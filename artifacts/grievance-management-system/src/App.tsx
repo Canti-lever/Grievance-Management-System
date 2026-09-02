@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import {
   GrievanceStatus, UserRole, getGetAdminGrievanceQueryKey,
-  getGetMyGrievanceQueryKey, getGetOfficerGrievanceQueryKey,
+  getGetCurrentUserQueryKey, getGetMyGrievanceQueryKey, getGetOfficerGrievanceQueryKey,
   getListCategoriesQueryKey, getListMyGrievancesQueryKey,
   getListNotificationsQueryKey, getListUsersQueryKey, useAcceptResolution, useAddAdminResolution,
   useAddOfficerResolution, useAdminChangeStatus, useAssignGrievance, useCreateCategory,
@@ -102,6 +102,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon };
 const citizenNav: NavItem[] = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/grievances', label: 'My grievances', icon: FileText },
+  { href: '/consents', label: 'Consents & requests', icon: ClipboardList },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/profile', label: 'Profile', icon: UserRound },
 ];
@@ -118,13 +119,22 @@ const officerNav: NavItem[] = [
 ];
 
 function AppShell({ children, mode = 'citizen' }: { children: React.ReactNode; mode?: 'citizen' | 'admin' | 'officer' }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const { data: user } = useGetCurrentUser();
   const logout = useLogout();
   const nav = mode === 'admin' ? adminNav : mode === 'officer' ? officerNav : citizenNav;
   const initials = (user?.name || (mode === 'admin' ? 'Admin team' : 'Resident')).split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
   const section = mode === 'admin' ? 'Administration' : mode === 'officer' ? 'Officer workspace' : 'Resident services';
+  const handleLogout = () => logout.mutate(undefined, {
+    onSuccess: () => {
+      queryClient.clear();
+      setAccountOpen(false);
+      setMobileOpen(false);
+      setLocation('/login');
+    },
+  });
   return <div className="min-h-[100dvh] bg-[#f4f6f8] text-[#172333]">
     <header className="sticky top-0 z-30 border-t-[3px] border-[#0d1830] border-b border-[#dce3e7] bg-white">
       <div className="mx-auto flex h-[68px] max-w-[1400px] items-center justify-between px-5 sm:px-8">
@@ -136,10 +146,16 @@ function AppShell({ children, mode = 'citizen' }: { children: React.ReactNode; m
           <Link href="/notifications" data-testid="link-header-notifications" className="relative rounded p-2 text-[#53616c] hover:bg-[#eef8fb]"><Bell size={18} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#078dca]" /></Link>
           <button onClick={() => setMobileOpen((open) => !open)} data-testid="button-open-nav" className="rounded p-2 text-[#53616c] hover:bg-[#eef8fb] lg:hidden"><Menu size={19} /></button>
           <span className="hidden h-6 w-px bg-[#dce3e7] sm:block" />
-          <Link href="/profile" data-testid="link-sidebar-profile" className="flex items-center gap-2 rounded px-1 py-1 hover:bg-[#f2f7f9]"><span className="grid h-8 w-8 place-items-center rounded-full bg-[#e6f5fa] text-[11px] font-bold text-[#078dca]">{initials}</span><span className="hidden text-right sm:block"><strong className="block text-xs">{user?.name || 'Guest session'}</strong><small className="text-[10px] text-[#72808d]">{user?.department || section}</small></span><ChevronDown size={13} className="text-[#72808d]" /></Link>
+          <div className="relative">
+            <button onClick={() => setAccountOpen((open) => !open)} aria-expanded={accountOpen} aria-haspopup="menu" data-testid="button-account-menu" className="flex items-center gap-2 rounded px-1 py-1 text-left hover:bg-[#f2f7f9]"><span className="grid h-8 w-8 place-items-center rounded-full bg-[#e6f5fa] text-[11px] font-bold text-[#078dca]">{initials}</span><span className="hidden text-right sm:block"><strong className="block text-xs">{user?.name || 'Guest session'}</strong><small className="text-[10px] text-[#72808d]">{user?.department || section}</small></span><ChevronDown size={13} className={`text-[#72808d] transition-transform ${accountOpen ? 'rotate-180' : ''}`} /></button>
+            {accountOpen && <div role="menu" className="absolute right-0 top-11 z-40 min-w-44 rounded border border-[#dce3e7] bg-white p-1 shadow-lg">
+              <Link href="/profile" onClick={() => setAccountOpen(false)} role="menuitem" data-testid="link-account-profile" className="block rounded px-3 py-2.5 text-xs font-semibold text-[#344554] hover:bg-[#eef8fb]">My profile</Link>
+              <button onClick={handleLogout} disabled={logout.isPending} role="menuitem" data-testid="button-logout" className="flex w-full items-center gap-2 rounded px-3 py-2.5 text-left text-xs font-bold text-[#b54743] hover:bg-[#fff4f0]">{logout.isPending ? 'Signing out…' : <><LogOut size={14} />Sign out</>}</button>
+            </div>}
+          </div>
         </div>
       </div>
-      {mobileOpen && <nav className="border-t border-[#dce3e7] bg-white px-5 py-2 lg:hidden" aria-label="Primary navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} data-testid={`link-mobile-nav-${label.toLowerCase().replaceAll(' ', '-')}`} className="flex items-center gap-2 border-b border-[#eef1f3] py-3 text-sm font-semibold text-[#344554]"><Icon size={16} />{label}</Link>)}<button onClick={() => logout.mutate()} data-testid="button-logout" className="flex items-center gap-2 py-3 text-sm font-semibold text-[#b54743]"><LogOut size={16} />Sign out</button></nav>}
+      {mobileOpen && <nav className="border-t border-[#dce3e7] bg-white px-5 py-2 lg:hidden" aria-label="Primary navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} data-testid={`link-mobile-nav-${label.toLowerCase().replaceAll(' ', '-')}`} className="flex items-center gap-2 border-b border-[#eef1f3] py-3 text-sm font-semibold text-[#344554]"><Icon size={16} />{label}</Link>)}<Link href="/profile" onClick={() => setMobileOpen(false)} data-testid="link-mobile-profile" className="flex items-center gap-2 border-b border-[#eef1f3] py-3 text-sm font-semibold text-[#344554]"><UserRound size={16} />My profile</Link><button onClick={handleLogout} disabled={logout.isPending} data-testid="button-logout" className="flex items-center gap-2 py-3 text-sm font-semibold text-[#b54743]"><LogOut size={16} />{logout.isPending ? 'Signing out…' : 'Sign out'}</button></nav>}
     </header>
     <main className="mx-auto min-h-[calc(100dvh-132px)] max-w-[1400px] px-5 py-7 sm:px-8 lg:px-10">
       <div className="mb-6 flex items-center gap-2 text-xs text-[#72808d]"><Link href={mode === 'admin' ? '/admin' : mode === 'officer' ? '/officer' : '/dashboard'} className="font-semibold text-[#078dca]">Home</Link><span>/</span><span>{section}</span></div>
@@ -185,7 +201,7 @@ function LoginPage() {
   const login = useLogin();
   const [form, setForm] = useState({ identifier: '', password: '' });
   const [error, setError] = useState('');
-  return <AuthLayout eyebrow="Welcome back" title="Sign in to follow through." detail="Use your email or mobile number to see your concerns and the latest updates."><form className="mt-8 space-y-5" onSubmit={(event) => { event.preventDefault(); setError(''); login.mutate({ data: form }, { onSuccess: (result) => setLocation(result.user.role === UserRole.ADMIN ? '/admin' : result.user.role === UserRole.OFFICER ? '/officer' : '/dashboard'), onError: () => setError('That sign-in did not work. Check your details and try again.') }); }}><Field label="Email or mobile number" name="identifier" value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} placeholder="you@example.com" autoComplete="username" required /><Field label="Password" name="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Enter your password" autoComplete="current-password" required />{error && <p className="rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-login-error">{error}</p>}<Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">{login.isPending ? 'Signing in…' : <><LogIn size={17} />Sign in</>}</Button></form><div className="mt-8 border-t border-[#e1ded4] pt-6 text-center text-sm text-[#71817e]">New to DPDP Consultants? <Link href="/register" data-testid="link-register" className="font-bold text-[#078dca] hover:underline">Create an account</Link></div><Link href="/" data-testid="link-back-home" className="mt-6 flex items-center justify-center gap-2 text-xs font-bold text-[#72808d] hover:text-[#078dca]"><ArrowLeft size={14} />Back to DPDP Consultants</Link></AuthLayout>;
+  return <AuthLayout eyebrow="Welcome back" title="Sign in to follow through." detail="Use your email or mobile number to see your concerns and the latest updates."><form className="mt-8 space-y-5" onSubmit={(event) => { event.preventDefault(); setError(''); login.mutate({ data: form }, { onSuccess: (result) => setLocation(result.user.role === UserRole.ADMIN ? '/admin' : result.user.role === UserRole.OFFICER ? '/officer' : '/account'), onError: () => setError('That sign-in did not work. Check your details and try again.') }); }}><Field label="Email or mobile number" name="identifier" value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} placeholder="you@example.com" autoComplete="username" required /><Field label="Password" name="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Enter your password" autoComplete="current-password" required />{error && <p className="rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-login-error">{error}</p>}<Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">{login.isPending ? 'Signing in…' : <><LogIn size={17} />Sign in</>}</Button></form><div className="mt-8 border-t border-[#e1ded4] pt-6 text-center text-sm text-[#71817e]">New to DPDP Consultants? <Link href="/register" data-testid="link-register" className="font-bold text-[#078dca] hover:underline">Create an account</Link></div><Link href="/" data-testid="link-back-home" className="mt-6 flex items-center justify-center gap-2 text-xs font-bold text-[#72808d] hover:text-[#078dca]"><ArrowLeft size={14} />Back to DPDP Consultants</Link></AuthLayout>;
 }
 
 function RegisterPage() {
@@ -193,7 +209,7 @@ function RegisterPage() {
   const register = useRegister();
   const [form, setForm] = useState({ name: '', email: '', mobile: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
-  return <AuthLayout eyebrow="Start here" title="Create your resident account." detail="It takes about two minutes. Your account makes every update easy to find."><form className="mt-8 space-y-4" onSubmit={(event) => { event.preventDefault(); if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; } setError(''); register.mutate({ data: { ...form, email: form.email || null } }, { onSuccess: () => setLocation('/dashboard'), onError: () => setError('We could not create that account. Check the details and try again.') }); }}><Field label="Full name" name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" required /><Field label="Email address" name="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /><Field label="Mobile number" name="mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="+1 555 000 0000" required /><div className="grid gap-4 sm:grid-cols-2"><Field label="Password" name="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8 characters minimum" required /><Field label="Confirm password" name="confirmPassword" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} placeholder="Repeat password" required /></div>{error && <p className="rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-register-error">{error}</p>}<Button type="submit" className="mt-2 w-full" disabled={register.isPending} data-testid="button-register">{register.isPending ? 'Creating account…' : <><ArrowRight size={17} />Create account</>}</Button><p className="pt-2 text-center text-[11px] leading-5 text-[#85908b]">By continuing, you agree to use this service respectfully and accurately.</p></form><div className="mt-7 border-t border-[#e1ded4] pt-6 text-center text-sm text-[#71817e]">Already have an account? <Link href="/login" data-testid="link-login" className="font-bold text-[#3f7673] hover:underline">Sign in</Link></div></AuthLayout>;
+  return <AuthLayout eyebrow="Start here" title="Create your resident account." detail="It takes about two minutes. Your account makes every update easy to find."><form className="mt-8 space-y-4" onSubmit={(event) => { event.preventDefault(); if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; } setError(''); register.mutate({ data: { ...form, email: form.email || null } }, { onSuccess: () => setLocation('/account'), onError: () => setError('We could not create that account. Check the details and try again.') }); }}><Field label="Full name" name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" required /><Field label="Email address" name="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /><Field label="Mobile number" name="mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="+1 555 000 0000" required /><div className="grid gap-4 sm:grid-cols-2"><Field label="Password" name="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8 characters minimum" autoComplete="new-password" required /><Field label="Confirm password" name="confirmPassword" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} placeholder="Repeat password" autoComplete="new-password" required /></div>{error && <p className="rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-register-error">{error}</p>}<Button type="submit" className="mt-2 w-full" disabled={register.isPending} data-testid="button-register">{register.isPending ? 'Creating account…' : <><ArrowRight size={17} />Create account</>}</Button><p className="pt-2 text-center text-[11px] leading-5 text-[#85908b]">By continuing, you agree to use this service respectfully and accurately.</p></form><div className="mt-7 border-t border-[#e1ded4] pt-6 text-center text-sm text-[#71817e]">Already have an account? <Link href="/login" data-testid="link-login" className="font-bold text-[#3f7673] hover:underline">Sign in</Link></div></AuthLayout>;
 }
 
 function MetricCard({ label, value, detail, accent = 'teal', icon: Icon }: { label: string; value: string | number; detail: string; accent?: 'teal' | 'gold' | 'coral' | 'ink'; icon: LucideIcon }) {
@@ -306,7 +322,8 @@ function AdminGrievanceDetail({ mode = 'admin' }: { mode?: 'admin' | 'officer' }
   const assign = useAssignGrievance();
   const changeStatus = mode === 'admin' ? useAdminChangeStatus() : useOfficerChangeStatus();
   const addResolution = mode === 'admin' ? useAddAdminResolution() : useAddOfficerResolution();
-  const { data: users } = useListUsers({ page: 1, pageSize: 100, role: UserRole.OFFICER });
+  const officerQuery = { page: 1, pageSize: 100, role: UserRole.OFFICER };
+  const { data: users } = useListUsers(officerQuery, { query: { enabled: mode === 'admin', queryKey: getListUsersQueryKey(officerQuery) } });
   const [status, setStatus] = useState('');
   const [comment, setComment] = useState('');
   const [department, setDepartment] = useState('');
@@ -353,8 +370,137 @@ function NotFound() {
   return <div className="grid min-h-[100dvh] place-items-center bg-[#f7f4ea] p-6 text-center"><div><span className="mono-type text-7xl font-bold text-[#efc574]">404</span><h1 className="display-type mt-4 text-4xl font-bold text-[#203c49]">That page is not in the record.</h1><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#71817e]">The link may have moved, or the concern you’re looking for does not exist.</p><Link href="/" data-testid="link-not-found-home" className="mt-7 inline-flex items-center gap-2 rounded-lg bg-[#244d5e] px-4 py-3 text-sm font-bold text-white"><ArrowLeft size={16} />Return home</Link></div></div>;
 }
 
+function AccountLandingPage() {
+  const { data: user } = useGetCurrentUser();
+  return <AppShell>
+    <PageTitle eyebrow="Resident account" title="My account" description="Choose the service you want to manage." />
+    <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="max-w-2xl space-y-4">
+        <Link href="/consents" data-testid="link-account-consents" className="group flex items-center gap-5 rounded border border-[#e0e4e7] bg-white p-5 shadow-sm transition hover:border-[#078dca] hover:shadow-md sm:p-6">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded bg-[#eef7fb] text-[#078dca]"><ClipboardList size={34} strokeWidth={1.5} /></span>
+          <span><strong className="block text-lg text-[#26384a] group-hover:text-[#078dca]">Consents &amp; Requests</strong><small className="mt-1 block text-sm text-[#72808d]">Manage your consent records and principal rights requests</small></span>
+          <ArrowRight className="ml-auto shrink-0 text-[#9aa7b0] transition group-hover:translate-x-1 group-hover:text-[#078dca]" size={19} />
+        </Link>
+        <Link href="/dashboard" data-testid="link-account-grievances" className="group flex items-center gap-5 rounded border border-[#e0e4e7] bg-white p-5 shadow-sm transition hover:border-[#078dca] hover:shadow-md sm:p-6">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded bg-[#f5f5f5] text-[#526473]"><FileText size={34} strokeWidth={1.5} /></span>
+          <span><strong className="block text-lg text-[#26384a] group-hover:text-[#078dca]">Grievance Escalation Requests</strong><small className="mt-1 block text-sm text-[#72808d]">Grievance</small></span>
+          <ArrowRight className="ml-auto shrink-0 text-[#9aa7b0] transition group-hover:translate-x-1 group-hover:text-[#078dca]" size={19} />
+        </Link>
+      </div>
+      <aside className="h-fit rounded border border-[#dce3e7] bg-white p-6">
+        <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#eef7fb] text-[#078dca]"><UserRound size={20} /></span><strong className="text-lg text-[#26384a]">{user?.name || 'Resident'}</strong></div>
+        <div className="mt-5 space-y-3 border-t border-[#edf0f2] pt-5 text-sm text-[#53616c]"><p className="flex items-center gap-2"><span className="font-bold">Phone:</span>{user?.mobile || '—'}</p><p className="flex items-center gap-2 break-all"><span className="font-bold">Email:</span>{user?.email || '—'}</p></div>
+      </aside>
+    </div>
+  </AppShell>;
+}
+
+type ConsentRecord = {
+  id: string;
+  processingActivity: string;
+  purpose: string;
+  userActivity: string;
+  source: string;
+  status: string;
+  legacy: string;
+  digital: string;
+  consentedOn: string;
+  validTill: string;
+  sentOn: string;
+  deliveredOn: string;
+  paManager: string;
+  ipAddress: string;
+  deviceType: string;
+};
+
+const consentRecords: ConsentRecord[] = [{
+  id: 'newsletter-consent',
+  processingActivity: 'Newsletters',
+  purpose: 'Newsletter Departments',
+  userActivity: 'Promotional',
+  source: 'Organization',
+  status: 'Consented',
+  legacy: 'Live',
+  digital: 'Digital',
+  consentedOn: '09/02/2026 17:28',
+  validTill: '09/02/2027 17:28',
+  sentOn: '09/02/2026 17:28',
+  deliveredOn: '09/02/2026 17:28',
+  paManager: 'Nagiha Kumar',
+  ipAddress: '164.100.46.127',
+  deviceType: 'Windows Desktop',
+}];
+
+function PersonalDetails({ user }: { user?: { name?: string; email?: string | null; mobile?: string } }) {
+  return <section className="rounded border-2 border-[#1598cc] bg-[#f8fcfe] px-3 py-3 text-sm text-[#344554] sm:max-w-xl" data-testid="personal-details">
+    <p className="font-semibold">Personal Details :</p>
+    <p className="mt-1"><strong>Name:</strong> {user?.name || 'Resident'} <span className="mx-3"><strong>Email:</strong> {user?.email || '—'}</span><span><strong>Phone:</strong> {user?.mobile || '—'}</span></p>
+  </section>;
+}
+
+function ConsentListPage() {
+  const { data: user } = useGetCurrentUser();
+  const [sortMode, setSortMode] = useState<'source' | 'rights'>('source');
+  const [records, setRecords] = useState(consentRecords);
+  const [toast, setToast] = useState('');
+  const visibleRecords = sortMode === 'rights' ? [...records].sort((a, b) => a.status.localeCompare(b.status)) : records;
+  return <AppShell>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="flex items-center gap-2 text-xl font-bold text-[#53616c]"><Link href="/account" aria-label="Back to account" className="text-[#243754]"><LayoutDashboard size={19} /></Link><span>/</span><h1 data-testid="text-consents-title">Consents &amp; Requests</h1></div>
+      <div className="flex items-center gap-2 text-xs text-[#53616c]"><span>Sort By:</span><button onClick={() => setSortMode('source')} data-testid="button-sort-source" className={`rounded bg-[#078dca] px-4 py-2.5 font-semibold text-white ${sortMode === 'source' ? '' : 'opacity-70'}`}>Source Of Consent <ChevronDown className="ml-1 inline" size={13} /></button><Link href="/consents/rights" data-testid="button-principal-rights" className="rounded bg-[#078dca] px-4 py-2.5 font-semibold text-white hover:bg-[#0679ae]">Principal Rights</Link></div>
+    </div>
+    <PersonalDetails user={user} />
+    <section className="mt-6" data-testid="consents-section">
+      <h2 className="mb-4 text-xl font-normal text-[#63717c]">Consents</h2>
+      <div className="portal-table-wrap rounded-none border border-[#dce3e7] bg-white"><table className="portal-table min-w-[1120px]"><thead><tr><th>Actions</th><th>Processing Activity</th><th>Purpose of consent</th><th>User Activity Type</th><th>Source Of Consent</th><th>Status</th><th>Legacy / Live</th><th>Digital / Paper</th></tr></thead><tbody>{visibleRecords.map((record) => <tr key={record.id} data-testid={`row-consent-${record.id}`}><td><button onClick={() => { setRecords((items) => items.map((item) => item.id === record.id ? { ...item, status: 'Withdrawn' } : item)); setToast('Consent withdrawn successfully.'); }} disabled={record.status === 'Withdrawn'} className="rounded bg-[#078dca] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#9aa7b0]" data-testid={`button-withdraw-${record.id}`}>{record.status === 'Withdrawn' ? 'Withdrawn' : 'Withdraw'}</button></td><td><Link href={`/consents/${record.id}`} className="font-semibold text-[#243754] underline" data-testid={`link-consent-${record.id}`}>{record.processingActivity}</Link></td><td>{record.purpose}</td><td>{record.userActivity}</td><td>{record.source}</td><td>{record.status}</td><td>{record.legacy}</td><td>{record.digital}</td></tr>)}</tbody></table></div>
+    </section>
+    {toast && <Toast message={toast} onClose={() => setToast('')} />}
+  </AppShell>;
+}
+
+function PrincipalRightsPage() {
+  const { data: user } = useGetCurrentUser();
+  const [requestType, setRequestType] = useState('Access my personal data');
+  const [sent, setSent] = useState(false);
+  return <AppShell>
+    <PageTitle eyebrow="Consents & requests" title="Principal Rights" description="Raise and track a request to exercise your rights under the DPDP framework." />
+    <PersonalDetails user={user} />
+    <section className="mt-6 rounded border border-[#dce3e7] bg-white p-5 sm:p-7">
+      <h2 className="text-xl font-semibold text-[#344554]">Create a rights request</h2>
+      <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end"><label className="block"><span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#637270]">Request type</span><select value={requestType} onChange={(event) => setRequestType(event.target.value)} className="focus-ring h-11 w-full rounded border border-[#cbd6dc] bg-white px-3 text-sm outline-none"><option>Access my personal data</option><option>Correct my personal data</option><option>Delete my personal data</option><option>Withdraw all consent</option></select></label><Button onClick={() => setSent(true)} data-testid="button-submit-rights-request">{sent ? 'Request submitted' : 'Submit request'}</Button></div>
+    </section>
+    <section className="mt-6 overflow-hidden rounded border border-[#dce3e7] bg-white"><h2 className="border-b border-[#dce3e7] px-5 py-4 text-lg font-semibold text-[#344554]">My requests</h2><div className="portal-table-wrap"><table className="portal-table min-w-[720px]"><thead><tr><th>Request type</th><th>Submitted on</th><th>Status</th></tr></thead><tbody>{sent ? <tr><td>{requestType}</td><td>09/02/2026 17:28</td><td><span className="rounded bg-[#e7f0eb] px-2.5 py-1 text-xs font-bold text-[#2e6959]">Submitted</span></td></tr> : <tr><td colSpan={3} className="py-8 text-center text-sm text-[#72808d]">No rights requests submitted yet.</td></tr>}</tbody></table></div></section>
+  </AppShell>;
+}
+
+function ConsentDetailPage() {
+  const params = useParams<{ id: string }>();
+  const [, setLocation] = useLocation();
+  const record = consentRecords.find((item) => item.id === params.id) || consentRecords[0];
+  const [activeTab, setActiveTab] = useState(record.status);
+  return <AppShell>
+    <button onClick={() => setLocation('/consents')} data-testid="button-back-consents" className="mb-2 rounded bg-[#078dca] px-3 py-2 text-xs font-semibold text-white">Back</button>
+    <div className="mb-4 flex overflow-x-auto border-b border-[#dce3e7] bg-[#dff2f9]">{['Initiated', 'Deemed consent', 'Consented', 'Rejected', 'Not Delivered', 'Withdrawn', 'Expired', 'Bounced'].map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`whitespace-nowrap px-3 py-2.5 text-xs ${activeTab === tab ? 'bg-[#078dca] font-bold text-white' : 'text-[#344554]'}`}>{tab}</button>)}</div>
+    <section className="rounded border border-[#dce3e7] bg-white p-5 shadow-sm sm:p-7">
+      <div className="grid gap-x-12 gap-y-4 text-sm text-[#344554] md:grid-cols-2"><p><strong>Name :</strong> Resident</p><p><strong>Valid Till :</strong> {record.validTill}</p><p><strong>PA Manager :</strong> {record.paManager}</p><p><strong>Created On :</strong> {record.consentedOn}</p><p><strong>Processing Activity :</strong> {record.processingActivity}</p><p><strong>Last Updated on :</strong> {record.consentedOn}</p><p><strong>Email :</strong> Resident email</p><p><strong>Consented/Rejected On :</strong> {record.consentedOn}</p><p><strong>Phone :</strong> Resident phone</p><p><strong>Template :</strong> Live Consent Template English (Newsletter)</p><p><strong>Email Status :</strong> —</p><p><strong>Closed On :</strong> —</p><p><strong>User Activity Type :</strong> {record.userActivity}</p><p><strong>IP Address :</strong> {record.ipAddress}</p><p><strong>Device Type :</strong> {record.deviceType}</p><p><strong>Legacy / Live :</strong> {record.legacy.toLowerCase()}</p><p><strong>Digital/Paper :</strong> {record.digital.toLowerCase()}</p></div>
+      <div className="mt-10 border border-[#dce3e7]"><div className="inline-block -mt-8 ml-3 rounded-t border border-b-0 border-[#dce3e7] bg-white px-3 py-2 text-xs text-[#53616c]">Template Body</div><article className="border-t border-[#dce3e7] p-5 text-sm leading-7 text-[#344554] sm:p-8"><h2 className="mb-8 text-center text-2xl font-normal">Newsletter Consent Template</h2><p className="font-bold">Thank You for Your Interest in Subscribing to the DPDP Consultants Newsletter!</p><p className="mt-4">By subscribing, you'll receive updates on new products, events, industry news and best practices. To keep you informed DPDP Consultants requests your explicit consent to process your personal data in accordance with the Digital Personal Data Protection (DPDP) Act, 2023.</p><p className="mt-4">Before subscribing, please review our <strong className="text-[#168d85]">Privacy Notice</strong>, which details:</p><ul className="my-3 list-disc pl-6"><li>The purpose for which your personal data will be used.</li><li>Your rights as a data principal under the DPDP Act, 2023.</li></ul><p>A copy of the <strong className="text-[#168d85]">Privacy Notice</strong> will also be sent to your email. You may withdraw your consent or exercise your data principal rights at any time via our <strong className="text-[#168d85]">Principal Rights</strong> page.</p></article></div>
+    </section>
+  </AppShell>;
+}
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
+  const { data: user, isLoading, isError } = useGetCurrentUser({ query: { retry: false, queryKey: getGetCurrentUserQueryKey() } });
+  useEffect(() => {
+    if (!isLoading && (isError || !user)) setLocation('/login');
+  }, [isError, isLoading, setLocation, user]);
+  if (isLoading) return <div className="grid min-h-[100dvh] place-items-center bg-[#f4f6f8] p-6"><div className="w-full max-w-sm rounded border border-[#dce3e7] bg-white p-6 text-center shadow-sm"><div className="mx-auto mb-4 h-2 w-28 animate-pulse rounded bg-[#dcebf0]" /><p className="text-sm font-semibold text-[#344554]">Checking your session…</p></div></div>;
+  if (isError || !user) return <div className="grid min-h-[100dvh] place-items-center bg-[#f4f6f8] p-6"><div className="w-full max-w-sm rounded border border-[#dce3e7] bg-white p-6 text-center shadow-sm"><p className="text-sm font-bold text-[#344554]">Sign in required</p><p className="mt-2 text-xs text-[#72808d]">Redirecting you to the secure sign-in page.</p><Link href="/login" className="mt-5 inline-flex rounded bg-[#078dca] px-4 py-2.5 text-xs font-bold text-white">Continue to sign in</Link></div></div>;
+  return <>{children}</>;
+}
+
 function Router() {
-  return <ErrorBoundary resetKey={location.pathname}><Switch><Route path="/" component={PortalLanding} /><Route path="/login" component={LoginPage} /><Route path="/register" component={RegisterPage} /><Route path="/dashboard" component={CitizenDashboard} /><Route path="/grievances/new" component={NewGrievancePage} /><Route path="/grievances/:id" component={() => <GrievanceDetailPage />} /><Route path="/grievances" component={() => <PortalGrievanceListPage />} /><Route path="/notifications" component={NotificationsPage} /><Route path="/profile" component={ProfilePage} /><Route path="/admin" component={AdminDashboard} /><Route path="/admin/grievances/:id" component={() => <GrievanceDetailPage mode="admin" />} /><Route path="/admin/grievances" component={() => <PortalGrievanceListPage mode="admin" />} /><Route path="/admin/users" component={UsersPage} /><Route path="/admin/categories" component={CategoriesPage} /><Route path="/admin/audit-logs" component={AuditLogsPage} /><Route path="/officer" component={() => <OfficerDashboard />} /><Route path="/officer/grievances/:id" component={() => <GrievanceDetailPage mode="officer" />} /><Route path="/officer/grievances" component={() => <PortalGrievanceListPage mode="officer" />} /><Route component={NotFound} /></Switch></ErrorBoundary>;
+  return <ErrorBoundary resetKey={location.pathname}><Switch><Route path="/" component={PortalLanding} /><Route path="/login" component={LoginPage} /><Route path="/register" component={RegisterPage} /><Route path="/account" component={() => <ProtectedRoute><AccountLandingPage /></ProtectedRoute>} /><Route path="/dashboard" component={() => <ProtectedRoute><CitizenDashboard /></ProtectedRoute>} /><Route path="/grievances/new" component={() => <ProtectedRoute><NewGrievancePage /></ProtectedRoute>} /><Route path="/grievances/:id" component={() => <ProtectedRoute><GrievanceDetailPage /></ProtectedRoute>} /><Route path="/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage /></ProtectedRoute>} /><Route path="/consents/rights" component={() => <ProtectedRoute><PrincipalRightsPage /></ProtectedRoute>} /><Route path="/consents/:id" component={() => <ProtectedRoute><ConsentDetailPage /></ProtectedRoute>} /><Route path="/consents" component={() => <ProtectedRoute><ConsentListPage /></ProtectedRoute>} /><Route path="/notifications" component={() => <ProtectedRoute><NotificationsPage /></ProtectedRoute>} /><Route path="/profile" component={() => <ProtectedRoute><ProfilePage /></ProtectedRoute>} /><Route path="/admin" component={() => <ProtectedRoute><AdminDashboard /></ProtectedRoute>} /><Route path="/admin/grievances/:id" component={() => <ProtectedRoute><AdminGrievanceDetail mode="admin" /></ProtectedRoute>} /><Route path="/admin/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage mode="admin" /></ProtectedRoute>} /><Route path="/admin/users" component={() => <ProtectedRoute><UsersPage /></ProtectedRoute>} /><Route path="/admin/categories" component={() => <ProtectedRoute><CategoriesPage /></ProtectedRoute>} /><Route path="/admin/audit-logs" component={() => <ProtectedRoute><AuditLogsPage /></ProtectedRoute>} /><Route path="/officer" component={() => <ProtectedRoute><OfficerDashboard /></ProtectedRoute>} /><Route path="/officer/grievances/:id" component={() => <ProtectedRoute><AdminGrievanceDetail mode="officer" /></ProtectedRoute>} /><Route path="/officer/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage mode="officer" /></ProtectedRoute>} /><Route component={NotFound} /></Switch></ErrorBoundary>;
 }
 
 function OfficerDashboard() {

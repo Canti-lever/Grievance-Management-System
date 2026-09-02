@@ -187,7 +187,7 @@ router.post("/auth/login", async (req, res) => {
   await audit(user.id, "LOGIN", "USER", user.id);
   return res.json({ user: cleanUser(user) });
 });
-router.post("/auth/logout", requireAuth, async (req: AuthRequest, res) => {
+router.post("/auth/logout", async (req: AuthRequest, res) => {
   const token = req.cookies?.gms_session as string | undefined;
   if (token) await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
   res.clearCookie("gms_session");
