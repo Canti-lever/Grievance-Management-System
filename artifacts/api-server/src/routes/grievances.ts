@@ -6,6 +6,7 @@ import { db } from "@workspace/db";
 import {
   auditLogsTable,
   categoriesTable,
+  consentsTable,
   grievancesTable,
   notificationsTable,
   sessionsTable,
@@ -19,6 +20,7 @@ import {
   AdminChangeStatusBody,
   AssignGrievanceBody,
   CreateCategoryBody,
+  CreateConsentBody,
   CreateGrievanceBody,
   CreateOfficerBody,
   LoginBody,
@@ -94,6 +96,46 @@ const allow = (...roles: string[]) => (req: AuthRequest, res: Response, next: Ne
   if (!req.user || !roles.includes(req.user.role)) return fail(res, 403, "You don't have permission to perform this action.");
   return next();
 };
+const consentServices = {
+  NEWSLETTER: {
+    processingActivity: "Newsletter",
+    notice: "By choosing Newsletter, you agree that DPDP Consultants may use your name, email address, and phone number to send you newsletters, product updates, events, industry news, and best practices. You can withdraw this consent at any time from your Consents & Requests dashboard.",
+  },
+  ACCOUNT: {
+    processingActivity: "Account",
+    notice: "By choosing Account, you agree that DPDP Consultants may use your name, email address, and phone number to create and maintain your resident account and send account-related service communications and product updates. You can withdraw this consent at any time from your Consents & Requests dashboard.",
+  },
+  SUPPORT: {
+    processingActivity: "Support",
+    notice: "By choosing Support, you agree that DPDP Consultants may use your name, email address, and phone number to respond to your support request, provide service guidance, and send relevant support and product updates. You can withdraw this consent at any time from your Consents & Requests dashboard.",
+  },
+} as const;
+const publicConsent = (consent: typeof consentsTable.$inferSelect) => ({
+  id: consent.id,
+  service: consent.service,
+  processingActivity: consent.processingActivity,
+  purpose: consent.purpose,
+  name: consent.name,
+  email: consent.email,
+  phone: consent.phone,
+  noticeContent: consent.noticeContent,
+  consentAccepted: consent.consentAccepted,
+  userActivityType: consent.userActivityType,
+  sourceOfConsent: consent.sourceOfConsent,
+  status: consent.status,
+  legacy: consent.legacy,
+  digitalPaper: consent.digitalPaper,
+  consentedAt: consent.consentedAt.toISOString(),
+  validTill: consent.validTill?.toISOString() ?? null,
+  paManager: consent.paManager,
+  template: consent.template,
+  emailStatus: consent.emailStatus,
+  closedOn: consent.closedOn?.toISOString() ?? null,
+  ipAddress: consent.ipAddress,
+  deviceType: consent.deviceType,
+  createdAt: consent.createdAt.toISOString(),
+  updatedAt: consent.updatedAt.toISOString(),
+});
 const parsePage = (value: unknown) => Math.max(1, Number(value ?? 1) || 1);
 const parsePageSize = (value: unknown) => Math.min(100, Math.max(10, Number(value ?? 20) || 20));
 const publicCategory = (category: typeof categoriesTable.$inferSelect) => ({ id: category.id, name: category.name, description: category.description, isActive: category.isActive });
@@ -202,6 +244,53 @@ router.put("/users/me", requireAuth, async (req: AuthRequest, res) => {
   await db.update(usersTable).set({ name: parsed.data.name, email: parsed.data.email ?? null, mobile: parsed.data.mobile, updatedAt: new Date() }).where(eq(usersTable.id, req.user!.id));
   const [updated] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.id));
   return res.json(cleanUser(updated));
+});
+router.get("/consents", requireAuth, allow("USER"), async (req: AuthRequest, res) => {
+  const rows = await db.select().from(consentsTable).where(eq(consentsTable.userId, req.user!.id)).orderBy(desc(consentsTable.createdAt));
+  return res.json(rows.map(publicConsent));
+});
+router.get("/consents/:id", requireAuth, allow("USER"), async (req: AuthRequest, res) => {
+  const [consent] = await db.select().from(consentsTable).where(and(eq(consentsTable.id, String(req.params.id)), eq(consentsTable.userId, req.user!.id))).limit(1);
+  if (!consent) return fail(res, 404, "The consent record could not be found.");
+  return res.json(publicConsent(consent));
+});
+router.post("/consents", requireAuth, allow("USER"), async (req: AuthRequest, res) => {
+  const parsed = CreateConsentBody.safeParse(req.body);
+  if (!parsed.success || !parsed.data.consentAccepted) {
+    return fail(res, 400, "Please accept the consent notice before submitting.");
+  }
+  const service = consentServices[parsed.data.service];
+  const now = new Date();
+  const consent = {
+    id: id(),
+    userId: req.user!.id,
+    service: parsed.data.service,
+    processingActivity: service.processingActivity,
+    purpose: service.processingActivity,
+    name: parsed.data.name,
+    email: parsed.data.email,
+    phone: parsed.data.phone,
+    noticeContent: service.notice,
+    consentAccepted: true,
+    userActivityType: "Promotional",
+    sourceOfConsent: "Organization",
+    status: "Consented",
+    legacy: "Live",
+    digitalPaper: "Digital",
+    consentedAt: now,
+    validTill: new Date(now.getTime() + 1000 * 60 * 60 * 24 * 365),
+    paManager: "DPDP Consultants",
+    template: `Live Consent Template English (${service.processingActivity})`,
+    emailStatus: "Not sent",
+    closedOn: null,
+    ipAddress: req.ip ?? null,
+    deviceType: req.get("user-agent") ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.insert(consentsTable).values(consent);
+  await audit(req.user!.id, "CREATE_CONSENT", "CONSENT", consent.id, service.processingActivity);
+  return res.status(201).json(publicConsent(consent));
 });
 
 router.get("/categories", requireAuth, async (_req, res) => {

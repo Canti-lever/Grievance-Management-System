@@ -127,6 +127,123 @@ export const UpdateCurrentUserResponse = zod.object({
 
 
 /**
+ * @summary List current user's consent records
+ */
+export const ListMyConsentsResponseItem = zod.object({
+  "id": zod.string(),
+  "service": zod.enum(['NEWSLETTER', 'ACCOUNT', 'SUPPORT']),
+  "processingActivity": zod.string(),
+  "purpose": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "noticeContent": zod.string(),
+  "consentAccepted": zod.boolean(),
+  "userActivityType": zod.string(),
+  "sourceOfConsent": zod.string(),
+  "status": zod.string(),
+  "legacy": zod.string(),
+  "digitalPaper": zod.string(),
+  "consentedAt": zod.string(),
+  "validTill": zod.string().nullable(),
+  "paManager": zod.string().nullable(),
+  "template": zod.string(),
+  "emailStatus": zod.string().nullable(),
+  "closedOn": zod.string().nullable(),
+  "ipAddress": zod.string().nullable(),
+  "deviceType": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListMyConsentsResponse = zod.array(ListMyConsentsResponseItem)
+
+
+/**
+ * @summary Save a consent for a selected service
+ */
+export const createConsentBodyNameMin = 2;
+export const createConsentBodyNameMax = 160;
+
+export const createConsentBodyEmailMin = 3;
+export const createConsentBodyEmailMax = 320;
+
+export const createConsentBodyPhoneMin = 7;
+export const createConsentBodyPhoneMax = 40;
+
+
+
+export const CreateConsentBody = zod.object({
+  "service": zod.enum(['NEWSLETTER', 'ACCOUNT', 'SUPPORT']),
+  "name": zod.string().min(createConsentBodyNameMin).max(createConsentBodyNameMax),
+  "email": zod.string().min(createConsentBodyEmailMin).max(createConsentBodyEmailMax),
+  "phone": zod.string().min(createConsentBodyPhoneMin).max(createConsentBodyPhoneMax),
+  "consentAccepted": zod.boolean()
+})
+
+export const CreateConsentResponse = zod.object({
+  "id": zod.string(),
+  "service": zod.enum(['NEWSLETTER', 'ACCOUNT', 'SUPPORT']),
+  "processingActivity": zod.string(),
+  "purpose": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "noticeContent": zod.string(),
+  "consentAccepted": zod.boolean(),
+  "userActivityType": zod.string(),
+  "sourceOfConsent": zod.string(),
+  "status": zod.string(),
+  "legacy": zod.string(),
+  "digitalPaper": zod.string(),
+  "consentedAt": zod.string(),
+  "validTill": zod.string().nullable(),
+  "paManager": zod.string().nullable(),
+  "template": zod.string(),
+  "emailStatus": zod.string().nullable(),
+  "closedOn": zod.string().nullable(),
+  "ipAddress": zod.string().nullable(),
+  "deviceType": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Get one consent belonging to the current user
+ */
+export const GetMyConsentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetMyConsentResponse = zod.object({
+  "id": zod.string(),
+  "service": zod.enum(['NEWSLETTER', 'ACCOUNT', 'SUPPORT']),
+  "processingActivity": zod.string(),
+  "purpose": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "noticeContent": zod.string(),
+  "consentAccepted": zod.boolean(),
+  "userActivityType": zod.string(),
+  "sourceOfConsent": zod.string(),
+  "status": zod.string(),
+  "legacy": zod.string(),
+  "digitalPaper": zod.string(),
+  "consentedAt": zod.string(),
+  "validTill": zod.string().nullable(),
+  "paManager": zod.string().nullable(),
+  "template": zod.string(),
+  "emailStatus": zod.string().nullable(),
+  "closedOn": zod.string().nullable(),
+  "ipAddress": zod.string().nullable(),
+  "deviceType": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
  * @summary Submit a grievance
  */
 export const createGrievanceBodySubjectMin = 5;

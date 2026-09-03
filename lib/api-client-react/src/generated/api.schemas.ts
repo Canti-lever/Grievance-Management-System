@@ -80,6 +80,77 @@ export interface ProfileUpdate {
   mobile: string;
 }
 
+export type ConsentService = typeof ConsentService[keyof typeof ConsentService];
+
+
+export const ConsentService = {
+  NEWSLETTER: 'NEWSLETTER',
+  ACCOUNT: 'ACCOUNT',
+  SUPPORT: 'SUPPORT',
+} as const;
+
+export interface Consent {
+  id: string;
+  service: ConsentService;
+  processingActivity: string;
+  purpose: string;
+  name: string;
+  email: string;
+  phone: string;
+  noticeContent: string;
+  consentAccepted: boolean;
+  userActivityType: string;
+  sourceOfConsent: string;
+  status: string;
+  legacy: string;
+  digitalPaper: string;
+  consentedAt: string;
+  /** @nullable */
+  validTill: string | null;
+  /** @nullable */
+  paManager: string | null;
+  template: string;
+  /** @nullable */
+  emailStatus: string | null;
+  /** @nullable */
+  closedOn: string | null;
+  /** @nullable */
+  ipAddress: string | null;
+  /** @nullable */
+  deviceType: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ConsentInputService = typeof ConsentInputService[keyof typeof ConsentInputService];
+
+
+export const ConsentInputService = {
+  NEWSLETTER: 'NEWSLETTER',
+  ACCOUNT: 'ACCOUNT',
+  SUPPORT: 'SUPPORT',
+} as const;
+
+export interface ConsentInput {
+  service: ConsentInputService;
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  name: string;
+  /**
+     * @minLength 3
+     * @maxLength 320
+     */
+  email: string;
+  /**
+     * @minLength 7
+     * @maxLength 40
+     */
+  phone: string;
+  consentAccepted: boolean;
+}
+
 export interface Category {
   id: string;
   name: string;

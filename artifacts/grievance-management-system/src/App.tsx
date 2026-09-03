@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+ import { useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import {
@@ -10,18 +10,19 @@ import {
 } from 'lucide-react';
 import {
   GrievanceStatus, UserRole, getGetAdminGrievanceQueryKey,
-  getGetCurrentUserQueryKey, getGetMyGrievanceQueryKey, getGetOfficerGrievanceQueryKey,
+  getGetCurrentUserQueryKey, getGetMyConsentQueryKey, getGetMyGrievanceQueryKey, getGetOfficerGrievanceQueryKey,
+  getListMyConsentsQueryKey,
   getListCategoriesQueryKey, getListMyGrievancesQueryKey,
   getListNotificationsQueryKey, getListUsersQueryKey, useAcceptResolution, useAddAdminResolution,
   useAddOfficerResolution, useAdminChangeStatus, useAssignGrievance, useCreateCategory,
-  useCreateGrievance, useCreateOfficer, useDeactivateCategory, useGetAdminDashboard,
-  useGetAdminGrievance, useGetCurrentUser, useGetMyGrievance,
+  useCreateConsent, useCreateGrievance, useCreateOfficer, useDeactivateCategory, useGetAdminDashboard,
+  useGetAdminGrievance, useGetCurrentUser, useGetMyConsent, useGetMyGrievance,
   useGetOfficerDashboard, useGetOfficerGrievance, useListAdminGrievances, useListAuditLogs,
-  useListCategories, useListMyGrievances, useListNotifications, useListOfficerGrievances,
+  useListCategories, useListMyConsents, useListMyGrievances, useListNotifications, useListOfficerGrievances,
   useListUsers, useLogin, useLogout, useMarkAllNotificationsRead, useMarkNotificationRead,
   useOfficerChangeStatus, useRegister, useSetUserActive, useUpdateCategory, useUpdateCurrentUser,
 } from '@workspace/api-client-react';
-import type { Grievance, GrievanceDetail, GrievanceStatus as GrievanceStatusType } from '@workspace/api-client-react';
+import type { Consent, Grievance, GrievanceDetail, GrievanceStatus as GrievanceStatusType } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -49,6 +50,62 @@ function Logo({ inverse = false }: { inverse?: boolean }) {
     <span className="leading-none"><strong className="block text-[17px] font-extrabold tracking-[-.06em]">DPDP <span className="text-[#078dca]">CONSULTANTS</span></strong><small className={`mt-1 block text-[9px] font-bold uppercase tracking-[.16em] ${inverse ? 'text-slate-300' : 'text-[#72808d]'}`}>Grievance portal</small></span>
   </Link>;
 }
+
+type ServiceKey = 'NEWSLETTER' | 'ACCOUNT' | 'SUPPORT';
+type ServiceConfig = {
+  key: ServiceKey;
+  slug: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  notice: string;
+};
+const serviceConfigs: ServiceConfig[] = [
+  {
+    key: 'NEWSLETTER',
+    slug: 'newsletter',
+    title: 'Newsletter',
+    description: 'Receive practical updates, product news, events, and industry insights.',
+    icon: FileText,
+    notice: 'By choosing Newsletter, you agree that DPDP Consultants may use your name, email address, and phone number to send you newsletters, product updates, events, industry news, and best practices. You can withdraw this consent at any time from your Consents & Requests dashboard.',
+  },
+  {
+    key: 'ACCOUNT',
+    slug: 'account',
+    title: 'Account',
+    description: 'Keep your resident profile and service records together in one secure place.',
+    icon: UserRound,
+    notice: 'By choosing Account, you agree that DPDP Consultants may use your name, email address, and phone number to create and maintain your resident account and send account-related service communications and product updates. You can withdraw this consent at any time from your Consents & Requests dashboard.',
+  },
+  {
+    key: 'SUPPORT',
+    slug: 'support',
+    title: 'Support',
+    description: 'Get guidance from the team when you need help with a service or concern.',
+    icon: LifeBuoy,
+    notice: 'By choosing Support, you agree that DPDP Consultants may use your name, email address, and phone number to respond to your support request, provide service guidance, and send relevant support and product updates. You can withdraw this consent at any time from your Consents & Requests dashboard.',
+  },
+];
+const pendingServiceStorageKey = 'gms_pending_service_consent';
+type PendingServiceSubmission = { service: ServiceKey; name: string; email: string; phone: string; consentAccepted: true };
+const readPendingService = (): PendingServiceSubmission | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = JSON.parse(window.sessionStorage.getItem(pendingServiceStorageKey) || 'null') as Partial<PendingServiceSubmission> | null;
+    if (value?.service && value.name && value.email && value.phone && value.consentAccepted) return value as PendingServiceSubmission;
+  } catch {
+    window.sessionStorage.removeItem(pendingServiceStorageKey);
+  }
+  return null;
+};
+const clearPendingService = () => {
+  if (typeof window !== 'undefined') window.sessionStorage.removeItem(pendingServiceStorageKey);
+};
+const postAuthLocation = (role: string) => {
+  const pending = readPendingService();
+  if (pending && role === UserRole.USER) return `/services/${pending.service.toLowerCase()}`;
+  return role === UserRole.ADMIN ? '/admin' : role === UserRole.OFFICER ? '/officer' : '/account';
+};
 
 function Button({ children, variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'quiet' | 'outline' | 'danger'; 'data-testid'?: string }) {
   const styles = {
@@ -176,6 +233,7 @@ function PortalLanding() {
         <div className="max-w-2xl"><p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-[#078dca]">Grievance Management System</p><h1 className="display-type text-4xl font-extrabold leading-tight sm:text-6xl">Your concern deserves a clear response.</h1><p className="mt-5 max-w-xl text-base leading-7 text-[#53616c]">Submit a grievance, follow its status, and keep a reliable record of every update from the service team.</p><div className="mt-7 flex flex-wrap gap-3"><Link href="/register" data-testid="link-start-concern" className="inline-flex items-center gap-2 rounded bg-[#078dca] px-5 py-3 text-sm font-bold text-white hover:bg-[#0679ae]">Submit a grievance <ArrowRight size={16} /></Link><Link href="/login" data-testid="link-track-concern" className="inline-flex items-center gap-2 rounded border border-[#c8d3da] bg-white px-5 py-3 text-sm font-bold text-[#26384a] hover:border-[#078dca]">Track an existing grievance</Link></div></div>
         <div className="border border-[#c8d3da] bg-white p-5 shadow-[0_10px_25px_rgba(13,24,48,.06)]"><div className="flex items-center justify-between border-b border-[#e3e8eb] pb-4"><span className="text-xs font-bold text-[#344554]">Service request status</span><span className="rounded bg-[#e6f5fa] px-2 py-1 text-[10px] font-bold text-[#078dca]">LIVE RECORD</span></div><div className="py-6"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#72808d]">Reference number</p><p className="mono-type mt-2 text-xl font-bold text-[#0d1830]">GRV-2026-01872</p><p className="mt-5 text-sm font-bold text-[#172333]">Streetlight outage on Mango Avenue</p><p className="mt-1 text-xs text-[#72808d]">Public lighting · North district</p></div><div className="grid grid-cols-4 gap-1 border-t border-[#e3e8eb] pt-5 text-center text-[10px] text-[#53616c]"><span><i className="mx-auto mb-2 block h-3 w-3 rounded-full bg-[#078dca]" />Submitted</span><span><i className="mx-auto mb-2 block h-3 w-3 rounded-full bg-[#078dca]" />Reviewed</span><span><i className="mx-auto mb-2 block h-3 w-3 rounded-full bg-[#078dca]" />Assigned</span><span><i className="mx-auto mb-2 block h-3 w-3 rounded-full bg-[#d6e0e5]" />Resolved</span></div></div>
       </section>
+      <section className="border-b border-[#dce3e7] py-14" id="services"><div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[#078dca]">Choose a service</p><h2 className="display-type mt-2 text-3xl font-bold text-[#203c49] sm:text-4xl">Stay informed, supported, and in control.</h2></div><p className="max-w-md text-sm leading-6 text-[#627471]">Tell us how you would like to engage. We’ll record your choice with the notice you accepted.</p></div><div className="grid gap-4 md:grid-cols-3">{serviceConfigs.map((service) => { const Icon = service.icon; return <Link key={service.key} href={`/services/${service.slug}`} data-testid={`link-service-${service.slug}`} className="group rounded-2xl border border-[#dfdfd5] bg-[#fffdf8] p-5 shadow-[0_3px_0_#e4e1d8] transition hover:-translate-y-1 hover:border-[#3f7673] hover:shadow-[0_7px_0_#d5d1c5]"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#e3efec] text-[#3f7673] transition group-hover:bg-[#3f7673] group-hover:text-white"><Icon size={21} /></span><h3 className="mt-5 text-lg font-bold text-[#315467]">{service.title}</h3><p className="mt-2 text-sm leading-6 text-[#71817e]">{service.description}</p><span className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-[#3f7673]">Choose {service.title} <ArrowRight size={14} /></span></Link>; })}</div></section>
       <section className="grid gap-5 py-12 md:grid-cols-3"><div className="border-l-4 border-[#078dca] bg-white p-5"><span className="mono-type text-lg font-bold text-[#078dca]">01</span><h2 className="mt-4 font-bold">Submit once</h2><p className="mt-2 text-sm leading-6 text-[#53616c]">Share the details and supporting files the right team needs to understand the issue.</p></div><div className="border-l-4 border-[#078dca] bg-white p-5"><span className="mono-type text-lg font-bold text-[#078dca]">02</span><h2 className="mt-4 font-bold">Track clearly</h2><p className="mt-2 text-sm leading-6 text-[#53616c]">See status changes, ownership, and resolution notes in one accessible record.</p></div><div className="border-l-4 border-[#078dca] bg-white p-5"><span className="mono-type text-lg font-bold text-[#078dca]">03</span><h2 className="mt-4 font-bold">Close the loop</h2><p className="mt-2 text-sm leading-6 text-[#53616c]">Review the response and confirm when your grievance has been resolved.</p></div></section>
     </main>
     <footer className="bg-[#0d1830] px-5 py-6 text-center text-xs text-[#c3ced8]">Copyright 2026 · Grievance Management System · Privacy and accountability by design</footer>
@@ -196,12 +254,94 @@ function AuthLayout({ children, eyebrow, title, detail }: { children: React.Reac
   return <div className="min-h-[100dvh] bg-[#f4f6f8]"><header className="border-t-[3px] border-[#0d1830] border-b border-[#dce3e7] bg-white"><div className="mx-auto flex h-[70px] max-w-[1200px] items-center justify-between px-5 sm:px-8"><Logo /><Link href="/" data-testid="link-auth-home" className="text-xs font-bold text-[#53616c] hover:text-[#078dca]">Public portal</Link></div></header><main className="mx-auto grid max-w-[1200px] gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[.75fr_1fr] lg:py-16"><section className="hidden border border-[#c8d3da] bg-[#0d1830] p-9 text-white lg:block"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#72d0ef]">Secure citizen access</p><h2 className="display-type mt-5 text-4xl font-extrabold leading-tight">One record for every concern.</h2><p className="mt-5 text-sm leading-7 text-[#c3ced8]">Keep your submissions, status updates, and resolutions together in a transparent service record.</p><div className="mt-10 border-t border-[#34435b] pt-5 text-xs text-[#aebdca]"><ShieldCheck size={18} className="mb-3 text-[#72d0ef]" />Private by design. Accountable by default.</div></section><section className="mx-auto w-full max-w-[500px] page-enter"><div className="mb-8 lg:hidden"><Logo /></div><p className="text-xs font-bold uppercase tracking-[.14em] text-[#078dca]">{eyebrow}</p><h1 className="display-type mt-3 text-4xl font-extrabold text-[#172333]">{title}</h1><p className="mt-2 text-sm leading-6 text-[#53616c]">{detail}</p>{children}</section></main><footer className="mt-auto bg-[#0d1830] px-5 py-5 text-center text-xs text-[#c3ced8]">Copyright 2026 · Grievance Management System</footer></div>;
 }
 
+function ServiceConsentForm({ config }: { config: ServiceConfig }) {
+  const [, setLocation] = useLocation();
+  const { data: user, isLoading: userLoading } = useGetCurrentUser({ query: { retry: false, queryKey: getGetCurrentUserQueryKey() } });
+  const create = useCreateConsent();
+  const submittedRef = useRef(false);
+  const [form, setForm] = useState(() => {
+    const pending = readPendingService();
+    return pending?.service === config.key
+      ? { name: pending.name, email: pending.email, phone: pending.phone, consentAccepted: true }
+      : { name: '', email: '', phone: '', consentAccepted: false };
+  });
+  const [error, setError] = useState('');
+
+  const saveConsent = (values: { name: string; email: string; phone: string; consentAccepted: true }) => {
+    create.mutate({ data: { service: config.key, ...values } }, {
+      onSuccess: () => {
+        clearPendingService();
+        queryClient.invalidateQueries({ queryKey: getListMyConsentsQueryKey() });
+        setLocation('/consents');
+      },
+      onError: (requestError) => {
+        if ((requestError as { status?: number }).status === 401) {
+          if (typeof window !== 'undefined') window.sessionStorage.setItem(pendingServiceStorageKey, JSON.stringify({ service: config.key, ...values }));
+          setLocation('/login');
+          return;
+        }
+        setError('We could not save this service request. Please check your details and try again.');
+      },
+    });
+  };
+
+  useEffect(() => {
+    const pending = readPendingService();
+    if (user && pending?.service === config.key && !submittedRef.current) {
+      submittedRef.current = true;
+      saveConsent(pending);
+    }
+  }, [config.key, user]);
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    if (!form.consentAccepted) {
+      setError('Please accept the consent notice before submitting.');
+      return;
+    }
+    const values = { name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(), consentAccepted: true as const };
+    if (!user) {
+      if (typeof window !== 'undefined') window.sessionStorage.setItem(pendingServiceStorageKey, JSON.stringify({ service: config.key, ...values }));
+      setLocation('/login');
+      return;
+    }
+    saveConsent(values);
+  };
+  const Icon = config.icon;
+  return <div className="min-h-[100dvh] bg-[#f4f6f8] text-[#172333]">
+    <header className="border-t-[3px] border-[#0d1830] border-b border-[#dce3e7] bg-white">
+      <div className="mx-auto flex h-[70px] max-w-[1400px] items-center justify-between px-5 sm:px-8"><Logo /><div className="flex items-center gap-2"><Link href="/login" className="rounded px-3 py-2 text-xs font-bold text-[#344554] hover:bg-[#eef8fb]">Sign in</Link><Link href="/register" className="rounded bg-[#078dca] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0679ae]">Create account</Link></div></div>
+    </header>
+    <main className="mx-auto max-w-4xl px-5 py-9 sm:px-8 lg:py-14">
+      <div className="mb-8 text-xs text-[#72808d]"><Link href="/" className="font-semibold text-[#078dca]">Home</Link><span className="mx-2">/</span>Services<span className="mx-2">/</span>{config.title}</div>
+      <div className="mb-8 flex items-start gap-4"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#e3efec] text-[#3f7673]"><Icon size={23} /></span><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[#078dca]">Service consent</p><h1 className="display-type mt-2 text-4xl font-bold text-[#203c49]">{config.title}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[#627471]">{config.description}</p></div></div>
+      <form onSubmit={submit} className="rounded-2xl border border-[#dfdfd5] bg-[#fffdf8] p-5 shadow-[0_3px_0_#e4e1d8] sm:p-8">
+        <h2 className="text-xl font-bold text-[#315467]">Tell us about you</h2>
+        <p className="mt-1 text-sm text-[#87938e]">Use the details where you would like us to contact you about this service.</p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2"><Field label="Full name" name="service-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Your name" required /><Field label="Email address" name="service-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" required /><Field label="Phone number" name="service-phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+91 98765 43210" required /></div>
+        <section className="mt-7 border border-[#b9d8df] bg-[#f1f9fb] p-5" data-testid="service-consent-notice"><p className="text-xs font-bold uppercase tracking-[.12em] text-[#078dca]">Consent notice</p><p className="mt-3 text-sm leading-7 text-[#344554]">{config.notice}</p><label className="mt-5 flex cursor-pointer items-start gap-3 border-t border-[#d5e8ec] pt-4 text-sm font-semibold text-[#315467]"><input type="checkbox" checked={form.consentAccepted} onChange={(event) => setForm({ ...form, consentAccepted: event.target.checked })} className="mt-0.5 h-4 w-4 accent-[#078dca]" data-testid="checkbox-consent-accepted" />I have read and accept this consent notice.</label></section>
+        {error && <p className="mt-5 rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-service-error">{error}</p>}
+        {!user && !userLoading && <p className="mt-5 text-xs leading-5 text-[#72808d]">After you submit, we’ll ask you to sign in or create a resident account before saving this consent to your dashboard.</p>}
+        <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-[#e8e5dc] pt-5"><Link href="/" className="text-sm font-bold text-[#71817e] hover:text-[#315467]">Cancel</Link><Button type="submit" disabled={create.isPending || userLoading} data-testid="button-submit-service-consent">{create.isPending ? 'Saving…' : 'Submit service request'}</Button></div>
+      </form>
+    </main>
+    <footer className="bg-[#0d1830] px-5 py-6 text-center text-xs text-[#c3ced8]">Copyright 2026 · Grievance Management System · Privacy and accountability by design</footer>
+  </div>;
+}
+
+function ServiceSignupPage() {
+  const params = useParams<{ service: string }>();
+  const config = serviceConfigs.find((item) => item.slug === params.service);
+  return config ? <ServiceConsentForm config={config} /> : <NotFound />;
+}
+
 function LoginPage() {
   const [, setLocation] = useLocation();
   const login = useLogin();
   const [form, setForm] = useState({ identifier: '', password: '' });
   const [error, setError] = useState('');
-  return <AuthLayout eyebrow="Welcome back" title="Sign in to follow through." detail="Use your email or mobile number to see your concerns and the latest updates."><form className="mt-8 space-y-5" onSubmit={(event) => { event.preventDefault(); setError(''); login.mutate({ data: form }, { onSuccess: (result) => setLocation(result.user.role === UserRole.ADMIN ? '/admin' : result.user.role === UserRole.OFFICER ? '/officer' : '/account'), onError: () => setError('That sign-in did not work. Check your details and try again.') }); }}><Field label="Email or mobile number" name="identifier" value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} placeholder="you@example.com" autoComplete="username" required /><Field label="Password" name="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Enter your password" autoComplete="current-password" required />{error && <p className="rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-login-error">{error}</p>}<Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">{login.isPending ? 'Signing in…' : <><LogIn size={17} />Sign in</>}</Button></form><div className="mt-8 border-t border-[#e1ded4] pt-6 text-center text-sm text-[#71817e]">New to DPDP Consultants? <Link href="/register" data-testid="link-register" className="font-bold text-[#078dca] hover:underline">Create an account</Link></div><Link href="/" data-testid="link-back-home" className="mt-6 flex items-center justify-center gap-2 text-xs font-bold text-[#72808d] hover:text-[#078dca]"><ArrowLeft size={14} />Back to DPDP Consultants</Link></AuthLayout>;
+  return <AuthLayout eyebrow="Welcome back" title="Sign in to follow through." detail="Use your email or mobile number to see your concerns and the latest updates."><form className="mt-8 space-y-5" onSubmit={(event) => { event.preventDefault(); setError(''); login.mutate({ data: form }, { onSuccess: (result) => setLocation(postAuthLocation(result.user.role)), onError: () => setError('That sign-in did not work. Check your details and try again.') }); }}><Field label="Email or mobile number" name="identifier" value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} placeholder="you@example.com" autoComplete="username" required /><Field label="Password" name="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Enter your password" autoComplete="current-password" required />{error && <p className="rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-login-error">{error}</p>}<Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">{login.isPending ? 'Signing in…' : <><LogIn size={17} />Sign in</>}</Button></form><div className="mt-8 border-t border-[#e1ded4] pt-6 text-center text-sm text-[#71817e]">New to DPDP Consultants? <Link href="/register" data-testid="link-register" className="font-bold text-[#078dca] hover:underline">Create an account</Link></div><Link href="/" data-testid="link-back-home" className="mt-6 flex items-center justify-center gap-2 text-xs font-bold text-[#72808d] hover:text-[#078dca]"><ArrowLeft size={14} />Back to DPDP Consultants</Link></AuthLayout>;
 }
 
 function RegisterPage() {
@@ -209,7 +349,7 @@ function RegisterPage() {
   const register = useRegister();
   const [form, setForm] = useState({ name: '', email: '', mobile: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
-  return <AuthLayout eyebrow="Start here" title="Create your resident account." detail="It takes about two minutes. Your account makes every update easy to find."><form className="mt-8 space-y-4" onSubmit={(event) => { event.preventDefault(); if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; } setError(''); register.mutate({ data: { ...form, email: form.email || null } }, { onSuccess: () => setLocation('/account'), onError: () => setError('We could not create that account. Check the details and try again.') }); }}><Field label="Full name" name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" required /><Field label="Email address" name="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /><Field label="Mobile number" name="mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="+1 555 000 0000" required /><div className="grid gap-4 sm:grid-cols-2"><Field label="Password" name="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8 characters minimum" autoComplete="new-password" required /><Field label="Confirm password" name="confirmPassword" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} placeholder="Repeat password" autoComplete="new-password" required /></div>{error && <p className="rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-register-error">{error}</p>}<Button type="submit" className="mt-2 w-full" disabled={register.isPending} data-testid="button-register">{register.isPending ? 'Creating account…' : <><ArrowRight size={17} />Create account</>}</Button><p className="pt-2 text-center text-[11px] leading-5 text-[#85908b]">By continuing, you agree to use this service respectfully and accurately.</p></form><div className="mt-7 border-t border-[#e1ded4] pt-6 text-center text-sm text-[#71817e]">Already have an account? <Link href="/login" data-testid="link-login" className="font-bold text-[#3f7673] hover:underline">Sign in</Link></div></AuthLayout>;
+  return <AuthLayout eyebrow="Start here" title="Create your resident account." detail="It takes about two minutes. Your account makes every update easy to find."><form className="mt-8 space-y-4" onSubmit={(event) => { event.preventDefault(); if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; } setError(''); register.mutate({ data: { ...form, email: form.email || null } }, { onSuccess: (result) => setLocation(postAuthLocation(result.user.role)), onError: () => setError('We could not create that account. Check the details and try again.') }); }}><Field label="Full name" name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" required /><Field label="Email address" name="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /><Field label="Mobile number" name="mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="+1 555 000 0000" required /><div className="grid gap-4 sm:grid-cols-2"><Field label="Password" name="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8 characters minimum" autoComplete="new-password" required /><Field label="Confirm password" name="confirmPassword" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Repeat password" autoComplete="new-password" required /></div>{error && <p className="rounded-lg bg-[#fff0eb] p-3 text-sm font-semibold text-[#a9473f]" data-testid="text-register-error">{error}</p>}<Button type="submit" className="mt-2 w-full" disabled={register.isPending} data-testid="button-register">{register.isPending ? 'Creating account…' : <><ArrowRight size={17} />Create account</>}</Button><p className="pt-2 text-center text-[11px] leading-5 text-[#85908b]">By continuing, you agree to use this service respectfully and accurately.</p></form><div className="mt-7 border-t border-[#e1ded4] pt-6 text-center text-sm text-[#71817e]">Already have an account? <Link href="/login" data-testid="link-login" className="font-bold text-[#3f7673] hover:underline">Sign in</Link></div></AuthLayout>;
 }
 
 function MetricCard({ label, value, detail, accent = 'teal', icon: Icon }: { label: string; value: string | number; detail: string; accent?: 'teal' | 'gold' | 'coral' | 'ink'; icon: LucideIcon }) {
@@ -395,42 +535,6 @@ function AccountLandingPage() {
   </AppShell>;
 }
 
-type ConsentRecord = {
-  id: string;
-  processingActivity: string;
-  purpose: string;
-  userActivity: string;
-  source: string;
-  status: string;
-  legacy: string;
-  digital: string;
-  consentedOn: string;
-  validTill: string;
-  sentOn: string;
-  deliveredOn: string;
-  paManager: string;
-  ipAddress: string;
-  deviceType: string;
-};
-
-const consentRecords: ConsentRecord[] = [{
-  id: 'newsletter-consent',
-  processingActivity: 'Newsletters',
-  purpose: 'Newsletter Departments',
-  userActivity: 'Promotional',
-  source: 'Organization',
-  status: 'Consented',
-  legacy: 'Live',
-  digital: 'Digital',
-  consentedOn: '09/02/2026 17:28',
-  validTill: '09/02/2027 17:28',
-  sentOn: '09/02/2026 17:28',
-  deliveredOn: '09/02/2026 17:28',
-  paManager: 'Nagiha Kumar',
-  ipAddress: '164.100.46.127',
-  deviceType: 'Windows Desktop',
-}];
-
 function PersonalDetails({ user }: { user?: { name?: string; email?: string | null; mobile?: string } }) {
   return <section className="rounded border-2 border-[#1598cc] bg-[#f8fcfe] px-3 py-3 text-sm text-[#344554] sm:max-w-xl" data-testid="personal-details">
     <p className="font-semibold">Personal Details :</p>
@@ -440,9 +544,9 @@ function PersonalDetails({ user }: { user?: { name?: string; email?: string | nu
 
 function ConsentListPage() {
   const { data: user } = useGetCurrentUser();
+  const query = useListMyConsents();
   const [sortMode, setSortMode] = useState<'source' | 'rights'>('source');
-  const [records, setRecords] = useState(consentRecords);
-  const [toast, setToast] = useState('');
+  const records = query.data ?? [];
   const visibleRecords = sortMode === 'rights' ? [...records].sort((a, b) => a.status.localeCompare(b.status)) : records;
   return <AppShell>
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -452,9 +556,8 @@ function ConsentListPage() {
     <PersonalDetails user={user} />
     <section className="mt-6" data-testid="consents-section">
       <h2 className="mb-4 text-xl font-normal text-[#63717c]">Consents</h2>
-      <div className="portal-table-wrap rounded-none border border-[#dce3e7] bg-white"><table className="portal-table min-w-[1120px]"><thead><tr><th>Actions</th><th>Processing Activity</th><th>Purpose of consent</th><th>User Activity Type</th><th>Source Of Consent</th><th>Status</th><th>Legacy / Live</th><th>Digital / Paper</th></tr></thead><tbody>{visibleRecords.map((record) => <tr key={record.id} data-testid={`row-consent-${record.id}`}><td><button onClick={() => { setRecords((items) => items.map((item) => item.id === record.id ? { ...item, status: 'Withdrawn' } : item)); setToast('Consent withdrawn successfully.'); }} disabled={record.status === 'Withdrawn'} className="rounded bg-[#078dca] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#9aa7b0]" data-testid={`button-withdraw-${record.id}`}>{record.status === 'Withdrawn' ? 'Withdrawn' : 'Withdraw'}</button></td><td><Link href={`/consents/${record.id}`} className="font-semibold text-[#243754] underline" data-testid={`link-consent-${record.id}`}>{record.processingActivity}</Link></td><td>{record.purpose}</td><td>{record.userActivity}</td><td>{record.source}</td><td>{record.status}</td><td>{record.legacy}</td><td>{record.digital}</td></tr>)}</tbody></table></div>
+      <div className="portal-table-wrap rounded-none border border-[#dce3e7] bg-white"><table className="portal-table min-w-[1450px]"><thead><tr><th>Actions</th><th>Processing Activity</th><th>Purpose of consent</th><th>Name</th><th>Email</th><th>Phone</th><th>User Activity Type</th><th>Source Of Consent</th><th>Status</th><th>Legacy / Live</th><th>Digital / Paper</th></tr></thead><tbody>{query.isLoading ? <tr><td colSpan={11}><LoadingState rows={3} /></td></tr> : query.isError ? <tr><td colSpan={11}><ErrorState onRetry={() => query.refetch()} /></td></tr> : visibleRecords.length ? visibleRecords.map((record) => <tr key={record.id} data-testid={`row-consent-${record.id}`}><td><Link href={`/consents/${record.id}`} className="inline-flex rounded bg-[#078dca] px-3 py-2 text-xs font-semibold text-white" data-testid={`button-view-consent-${record.id}`}>View</Link></td><td><Link href={`/consents/${record.id}`} className="font-semibold text-[#243754] underline" data-testid={`link-consent-${record.id}`}>{record.processingActivity}</Link></td><td>{record.purpose}</td><td>{record.name}</td><td>{record.email}</td><td>{record.phone}</td><td>{record.userActivityType}</td><td>{record.sourceOfConsent}</td><td>{record.status}</td><td>{record.legacy}</td><td>{record.digitalPaper}</td></tr>) : <tr><td colSpan={11} className="py-10 text-center text-sm text-[#72808d]">No service consents have been submitted yet. Choose a service from the public portal to get started.</td></tr>}</tbody></table></div>
     </section>
-    {toast && <Toast message={toast} onClose={() => setToast('')} />}
   </AppShell>;
 }
 
@@ -476,14 +579,17 @@ function PrincipalRightsPage() {
 function ConsentDetailPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
-  const record = consentRecords.find((item) => item.id === params.id) || consentRecords[0];
-  const [activeTab, setActiveTab] = useState(record.status);
+  const query = useGetMyConsent(params.id || '');
+  const record = query.data;
+  const [activeTab, setActiveTab] = useState('Consented');
+  if (query.isLoading) return <AppShell><LoadingState rows={5} /></AppShell>;
+  if (query.isError || !record) return <AppShell><ErrorState onRetry={() => query.refetch()} /></AppShell>;
   return <AppShell>
     <button onClick={() => setLocation('/consents')} data-testid="button-back-consents" className="mb-2 rounded bg-[#078dca] px-3 py-2 text-xs font-semibold text-white">Back</button>
     <div className="mb-4 flex overflow-x-auto border-b border-[#dce3e7] bg-[#dff2f9]">{['Initiated', 'Deemed consent', 'Consented', 'Rejected', 'Not Delivered', 'Withdrawn', 'Expired', 'Bounced'].map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`whitespace-nowrap px-3 py-2.5 text-xs ${activeTab === tab ? 'bg-[#078dca] font-bold text-white' : 'text-[#344554]'}`}>{tab}</button>)}</div>
     <section className="rounded border border-[#dce3e7] bg-white p-5 shadow-sm sm:p-7">
-      <div className="grid gap-x-12 gap-y-4 text-sm text-[#344554] md:grid-cols-2"><p><strong>Name :</strong> Resident</p><p><strong>Valid Till :</strong> {record.validTill}</p><p><strong>PA Manager :</strong> {record.paManager}</p><p><strong>Created On :</strong> {record.consentedOn}</p><p><strong>Processing Activity :</strong> {record.processingActivity}</p><p><strong>Last Updated on :</strong> {record.consentedOn}</p><p><strong>Email :</strong> Resident email</p><p><strong>Consented/Rejected On :</strong> {record.consentedOn}</p><p><strong>Phone :</strong> Resident phone</p><p><strong>Template :</strong> Live Consent Template English (Newsletter)</p><p><strong>Email Status :</strong> —</p><p><strong>Closed On :</strong> —</p><p><strong>User Activity Type :</strong> {record.userActivity}</p><p><strong>IP Address :</strong> {record.ipAddress}</p><p><strong>Device Type :</strong> {record.deviceType}</p><p><strong>Legacy / Live :</strong> {record.legacy.toLowerCase()}</p><p><strong>Digital/Paper :</strong> {record.digital.toLowerCase()}</p></div>
-      <div className="mt-10 border border-[#dce3e7]"><div className="inline-block -mt-8 ml-3 rounded-t border border-b-0 border-[#dce3e7] bg-white px-3 py-2 text-xs text-[#53616c]">Template Body</div><article className="border-t border-[#dce3e7] p-5 text-sm leading-7 text-[#344554] sm:p-8"><h2 className="mb-8 text-center text-2xl font-normal">Newsletter Consent Template</h2><p className="font-bold">Thank You for Your Interest in Subscribing to the DPDP Consultants Newsletter!</p><p className="mt-4">By subscribing, you'll receive updates on new products, events, industry news and best practices. To keep you informed DPDP Consultants requests your explicit consent to process your personal data in accordance with the Digital Personal Data Protection (DPDP) Act, 2023.</p><p className="mt-4">Before subscribing, please review our <strong className="text-[#168d85]">Privacy Notice</strong>, which details:</p><ul className="my-3 list-disc pl-6"><li>The purpose for which your personal data will be used.</li><li>Your rights as a data principal under the DPDP Act, 2023.</li></ul><p>A copy of the <strong className="text-[#168d85]">Privacy Notice</strong> will also be sent to your email. You may withdraw your consent or exercise your data principal rights at any time via our <strong className="text-[#168d85]">Principal Rights</strong> page.</p></article></div>
+      <div className="grid gap-x-12 gap-y-4 text-sm text-[#344554] md:grid-cols-2"><p><strong>Name :</strong> {record.name}</p><p><strong>Valid Till :</strong> {formatDateTime(record.validTill)}</p><p><strong>PA Manager :</strong> {record.paManager || '—'}</p><p><strong>Created On :</strong> {formatDateTime(record.createdAt)}</p><p><strong>Processing Activity :</strong> {record.processingActivity}</p><p><strong>Last Updated on :</strong> {formatDateTime(record.updatedAt)}</p><p><strong>Email :</strong> {record.email}</p><p><strong>Consented/Rejected On :</strong> {formatDateTime(record.consentedAt)}</p><p><strong>Phone :</strong> {record.phone}</p><p><strong>Template :</strong> {record.template}</p><p><strong>Email Status :</strong> {record.emailStatus || '—'}</p><p><strong>Closed On :</strong> {formatDateTime(record.closedOn)}</p><p><strong>User Activity Type :</strong> {record.userActivityType}</p><p><strong>IP Address :</strong> {record.ipAddress || '—'}</p><p><strong>Device Type :</strong> {record.deviceType || '—'}</p><p><strong>Legacy / Live :</strong> {record.legacy}</p><p><strong>Digital/Paper :</strong> {record.digitalPaper}</p><p><strong>Purpose of consent :</strong> {record.purpose}</p><p><strong>Source of consent :</strong> {record.sourceOfConsent}</p><p><strong>Status :</strong> {record.status}</p></div>
+      <div className="mt-10 border border-[#dce3e7]"><div className="inline-block -mt-8 ml-3 rounded-t border border-b-0 border-[#dce3e7] bg-white px-3 py-2 text-xs text-[#53616c]">Accepted Consent Notice</div><article className="border-t border-[#dce3e7] p-5 text-sm leading-7 text-[#344554] sm:p-8"><h2 className="mb-8 text-center text-2xl font-normal">{record.processingActivity} Consent Notice</h2><p>{record.noticeContent}</p><p className="mt-5 text-xs text-[#72808d]">This is the notice accepted when the service request was submitted.</p></article></div>
     </section>
   </AppShell>;
 }
@@ -500,7 +606,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
-  return <ErrorBoundary resetKey={location.pathname}><Switch><Route path="/" component={PortalLanding} /><Route path="/login" component={LoginPage} /><Route path="/register" component={RegisterPage} /><Route path="/account" component={() => <ProtectedRoute><AccountLandingPage /></ProtectedRoute>} /><Route path="/dashboard" component={() => <ProtectedRoute><CitizenDashboard /></ProtectedRoute>} /><Route path="/grievances/new" component={() => <ProtectedRoute><NewGrievancePage /></ProtectedRoute>} /><Route path="/grievances/:id" component={() => <ProtectedRoute><GrievanceDetailPage /></ProtectedRoute>} /><Route path="/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage /></ProtectedRoute>} /><Route path="/consents/rights" component={() => <ProtectedRoute><PrincipalRightsPage /></ProtectedRoute>} /><Route path="/consents/:id" component={() => <ProtectedRoute><ConsentDetailPage /></ProtectedRoute>} /><Route path="/consents" component={() => <ProtectedRoute><ConsentListPage /></ProtectedRoute>} /><Route path="/notifications" component={() => <ProtectedRoute><NotificationsPage /></ProtectedRoute>} /><Route path="/profile" component={() => <ProtectedRoute><ProfilePage /></ProtectedRoute>} /><Route path="/admin" component={() => <ProtectedRoute><AdminDashboard /></ProtectedRoute>} /><Route path="/admin/grievances/:id" component={() => <ProtectedRoute><AdminGrievanceDetail mode="admin" /></ProtectedRoute>} /><Route path="/admin/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage mode="admin" /></ProtectedRoute>} /><Route path="/admin/users" component={() => <ProtectedRoute><UsersPage /></ProtectedRoute>} /><Route path="/admin/categories" component={() => <ProtectedRoute><CategoriesPage /></ProtectedRoute>} /><Route path="/admin/audit-logs" component={() => <ProtectedRoute><AuditLogsPage /></ProtectedRoute>} /><Route path="/officer" component={() => <ProtectedRoute><OfficerDashboard /></ProtectedRoute>} /><Route path="/officer/grievances/:id" component={() => <ProtectedRoute><AdminGrievanceDetail mode="officer" /></ProtectedRoute>} /><Route path="/officer/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage mode="officer" /></ProtectedRoute>} /><Route component={NotFound} /></Switch></ErrorBoundary>;
+  return <ErrorBoundary resetKey={location.pathname}><Switch><Route path="/" component={PortalLanding} /><Route path="/login" component={LoginPage} /><Route path="/register" component={RegisterPage} /><Route path="/services/:service" component={ServiceSignupPage} /><Route path="/account" component={() => <ProtectedRoute><AccountLandingPage /></ProtectedRoute>} /><Route path="/dashboard" component={() => <ProtectedRoute><CitizenDashboard /></ProtectedRoute>} /><Route path="/grievances/new" component={() => <ProtectedRoute><NewGrievancePage /></ProtectedRoute>} /><Route path="/grievances/:id" component={() => <ProtectedRoute><GrievanceDetailPage /></ProtectedRoute>} /><Route path="/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage /></ProtectedRoute>} /><Route path="/consents/rights" component={() => <ProtectedRoute><PrincipalRightsPage /></ProtectedRoute>} /><Route path="/consents/:id" component={() => <ProtectedRoute><ConsentDetailPage /></ProtectedRoute>} /><Route path="/consents" component={() => <ProtectedRoute><ConsentListPage /></ProtectedRoute>} /><Route path="/notifications" component={() => <ProtectedRoute><NotificationsPage /></ProtectedRoute>} /><Route path="/profile" component={() => <ProtectedRoute><ProfilePage /></ProtectedRoute>} /><Route path="/admin" component={() => <ProtectedRoute><AdminDashboard /></ProtectedRoute>} /><Route path="/admin/grievances/:id" component={() => <ProtectedRoute><AdminGrievanceDetail mode="admin" /></ProtectedRoute>} /><Route path="/admin/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage mode="admin" /></ProtectedRoute>} /><Route path="/admin/users" component={() => <ProtectedRoute><UsersPage /></ProtectedRoute>} /><Route path="/admin/categories" component={() => <ProtectedRoute><CategoriesPage /></ProtectedRoute>} /><Route path="/admin/audit-logs" component={() => <ProtectedRoute><AuditLogsPage /></ProtectedRoute>} /><Route path="/officer" component={() => <ProtectedRoute><OfficerDashboard /></ProtectedRoute>} /><Route path="/officer/grievances/:id" component={() => <ProtectedRoute><AdminGrievanceDetail mode="officer" /></ProtectedRoute>} /><Route path="/officer/grievances" component={() => <ProtectedRoute><PortalGrievanceListPage mode="officer" /></ProtectedRoute>} /><Route component={NotFound} /></Switch></ErrorBoundary>;
 }
 
 function OfficerDashboard() {

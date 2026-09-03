@@ -28,6 +28,8 @@ import type {
   Category,
   CategoryInput,
   ConflictResponse,
+  Consent,
+  ConsentInput,
   Grievance,
   GrievanceDetail,
   GrievanceInput,
@@ -517,6 +519,231 @@ export const useUpdateCurrentUser = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUpdateCurrentUserMutationOptions(options));
     }
+
+export const getListMyConsentsUrl = () => {
+
+
+
+
+  return `/api/consents`
+}
+
+/**
+ * @summary List current user's consent records
+ */
+export const listMyConsents = async ( options?: Parameters<typeof customFetch>[1]): Promise<Consent[]> => {
+
+  return customFetch<Consent[]>(getListMyConsentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyConsentsQueryKey = () => {
+    return [
+    `/api/consents`
+    ] as const;
+    }
+
+
+export const getListMyConsentsQueryOptions = <TData = Awaited<ReturnType<typeof listMyConsents>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyConsents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyConsentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyConsents>>> = ({ signal }) => listMyConsents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyConsents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyConsentsQueryResult = NonNullable<Awaited<ReturnType<typeof listMyConsents>>>
+export type ListMyConsentsQueryError = ErrorType<UnauthorizedResponse>
+
+
+/**
+ * @summary List current user's consent records
+ */
+
+export function useListMyConsents<TData = Awaited<ReturnType<typeof listMyConsents>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyConsents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyConsentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateConsentUrl = () => {
+
+
+
+
+  return `/api/consents`
+}
+
+/**
+ * @summary Save a consent for a selected service
+ */
+export const createConsent = async (consentInput: ConsentInput, options?: Parameters<typeof customFetch>[1]): Promise<Consent> => {
+
+  return customFetch<Consent>(getCreateConsentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(consentInput)
+  }
+);}
+
+
+
+
+
+export const getCreateConsentMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConsent>>, TError,{data: BodyType<ConsentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createConsent>>, TError,{data: BodyType<ConsentInput>}, TContext> => {
+
+const mutationKey = ['createConsent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createConsent>>, {data: BodyType<ConsentInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createConsent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateConsentMutationResult = NonNullable<Awaited<ReturnType<typeof createConsent>>>
+    export type CreateConsentMutationBody = BodyType<ConsentInput>
+    export type CreateConsentMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse>
+
+    /**
+ * @summary Save a consent for a selected service
+ */
+export const useCreateConsent = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConsent>>, TError,{data: BodyType<ConsentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createConsent>>,
+        TError,
+        {data: BodyType<ConsentInput>},
+        TContext
+      > => {
+      return useMutation(getCreateConsentMutationOptions(options));
+    }
+
+export const getGetMyConsentUrl = (id: string,) => {
+
+
+
+
+  return `/api/consents/${id}`
+}
+
+/**
+ * @summary Get one consent belonging to the current user
+ */
+export const getMyConsent = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<Consent> => {
+
+  return customFetch<Consent>(getGetMyConsentUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyConsentQueryKey = (id: string,) => {
+    return [
+    `/api/consents/${id}`
+    ] as const;
+    }
+
+
+export const getGetMyConsentQueryOptions = <TData = Awaited<ReturnType<typeof getMyConsent>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyConsent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyConsentQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyConsent>>> = ({ signal }) => getMyConsent(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyConsent>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyConsentQueryResult = NonNullable<Awaited<ReturnType<typeof getMyConsent>>>
+export type GetMyConsentQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+/**
+ * @summary Get one consent belonging to the current user
+ */
+
+export function useGetMyConsent<TData = Awaited<ReturnType<typeof getMyConsent>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyConsent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyConsentQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getCreateGrievanceUrl = () => {
 
